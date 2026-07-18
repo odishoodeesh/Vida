@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 // Load environment variables
 dotenv.config();
@@ -10,7 +11,35 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+// Increase limit to allow larger base64 image uploads
+app.use(express.json({ limit: "50mb" }));
+
+// Configure S3 Client
+let s3Client: S3Client | null = null;
+function getS3Client(): S3Client | null {
+  if (!s3Client) {
+    const region = process.env.AWS_S3_REGION || "ap-south-1";
+    const endpoint = process.env.AWS_S3_ENDPOINT;
+    const accessKeyId = process.env.AWS_S3_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.AWS_S3_SECRET_ACCESS_KEY;
+
+    if (!endpoint || !accessKeyId || !secretAccessKey) {
+      console.warn("S3 Storage environment variables are missing. File uploads will fallback to local base64.");
+      return null;
+    }
+
+    s3Client = new S3Client({
+      region,
+      endpoint,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+      forcePathStyle: true,
+    });
+  }
+  return s3Client;
+}
 
 // Lazy initialize the SDK
 let aiClient: GoogleGenAI | null = null;
@@ -32,6 +61,48 @@ function getAIClient(): GoogleGenAI {
   }
   return aiClient;
 }
+
+// S3-compatible image upload endpoint
+app.post("/api/upload", async (req: express.Request, res: express.Response) => {
+  try {
+    const { base64Data, fileName, mimeType } = req.body;
+    if (!base64Data || !fileName) {
+      res.status(400).json({ error: "Missing required fields: base64Data or fileName" });
+      return;
+    }
+
+    // Clean base64 data (remove header prefix if present)
+    const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Clean, "base64");
+
+    const s3 = getS3Client();
+    const bucket = process.env.AWS_S3_BUCKET || "vida";
+
+    if (s3) {
+      const uploadPath = fileName.startsWith("images/") ? fileName : `images/${fileName}`;
+      const command = new PutObjectCommand({
+        Bucket: bucket,
+        Key: uploadPath,
+        Body: buffer,
+        ContentType: mimeType || "image/jpeg",
+      });
+
+      await s3.send(command);
+
+      // Generate the public URL
+      const supabaseUrl = (process.env.VITE_SUPABASE_URL || "https://jyjtixllqqukiquxdpve.supabase.co").replace(/\/$/, "");
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${uploadPath}`;
+
+      res.json({ publicUrl });
+    } else {
+      console.warn("S3 upload client is not initialized, returning base64 string directly");
+      res.json({ publicUrl: base64Data });
+    }
+  } catch (error: any) {
+    console.error("Upload API Error:", error);
+    res.status(500).json({ error: error.message || "Failed to upload image to S3" });
+  }
+});
 
 const SYSTEM_INSTRUCTIONS = `You are the VIDA Alchemist, a highly sophisticated, elegant, and warm skincare authority for "VIDA Botanical".
 Your goal is to guide users through custom botanical oil recommendations based on their concerns, skin type (oily, dry, sensitive, mature, combination), hair goals, and scalp status.

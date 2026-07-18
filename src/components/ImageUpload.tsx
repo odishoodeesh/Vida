@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
-import { supabase, supabaseBucket } from '../lib/supabase';
 
 interface ImageUploadProps {
   value: string;
@@ -31,7 +30,7 @@ export default function ImageUpload({ value, onChange, label, className = "" }: 
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         try {
           const canvas = document.createElement('canvas');
           let width = img.width;
@@ -61,57 +60,43 @@ export default function ImageUpload({ value, onChange, label, className = "" }: 
 
           const isPng = file.type === 'image/png' || file.name.endsWith('.png');
           const mimeType = isPng ? 'image/png' : 'image/jpeg';
-          const quality = isPng ? undefined : 0.85;
 
-          // If Supabase is available, upload as a binary Blob
-          if (supabase) {
-            canvas.toBlob(async (blob) => {
-              if (!blob) {
-                setError("Error processing image file");
-                setIsUploading(false);
-                return;
-              }
+          const dataUrl = isPng 
+            ? canvas.toDataURL('image/png') 
+            : canvas.toDataURL('image/jpeg', 0.85);
 
-              try {
-                const ext = isPng ? 'png' : 'jpg';
-                const fileName = `images/${Date.now()}-${Math.random().toString(36).substring(2, 11)}.${ext}`;
+          const ext = isPng ? 'png' : 'jpg';
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}.${ext}`;
 
-                // Upload to Supabase bucket
-                const { data, error: uploadError } = await supabase.storage
-                  .from(supabaseBucket)
-                  .upload(fileName, blob, {
-                    contentType: mimeType,
-                    cacheControl: '3600',
-                    upsert: true
-                  });
+          try {
+            const response = await fetch('/api/upload', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                base64Data: dataUrl,
+                fileName,
+                mimeType
+              })
+            });
 
-                if (uploadError) {
-                  throw uploadError;
-                }
+            if (!response.ok) {
+              const errData = await response.json().catch(() => ({}));
+              throw new Error(errData.error || "Upload failed");
+            }
 
-                // Get public URL
-                const { data: { publicUrl } } = supabase.storage
-                  .from(supabaseBucket)
-                  .getPublicUrl(fileName);
-
-                onChange(publicUrl);
-              } catch (uploadErr: any) {
-                console.error("Supabase Storage upload failed, falling back to base64:", uploadErr);
-                // Fallback to base64 if upload fails
-                const dataUrl = isPng 
-                  ? canvas.toDataURL('image/png') 
-                  : canvas.toDataURL('image/jpeg', 0.75);
-                onChange(dataUrl);
-              } finally {
-                setIsUploading(false);
-              }
-            }, mimeType, quality);
-          } else {
-            // Fallback to base64 if Supabase is not initialized
-            const dataUrl = isPng 
-              ? canvas.toDataURL('image/png') 
-              : canvas.toDataURL('image/jpeg', 0.75);
+            const data = await response.json();
+            if (data.publicUrl) {
+              onChange(data.publicUrl);
+            } else {
+              throw new Error("No public URL returned");
+            }
+          } catch (uploadErr: any) {
+            console.error("Backend upload failed, falling back to base64:", uploadErr);
+            // Fallback to local base64 on error
             onChange(dataUrl);
+          } finally {
             setIsUploading(false);
           }
         } catch (err) {

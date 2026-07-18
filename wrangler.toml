@@ -1,6 +1,5 @@
 # Wrangler Configuration for VIDA Botanical Cloudflare Pages Deployment
 name = "vida-botanical"
 pages_build_output_dir = "dist"
-
-[compatibility_flags]
+compatibility_date = "2024-01-01"
 compatibility_flags = [ "nodejs_compat" ]

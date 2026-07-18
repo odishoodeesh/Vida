@@ -1,7 +1,7 @@
 -- ====================================================================
 -- VIDA BOTANICAL - UNRESTRICTED SUPABASE SETUP SCRIPT
 -- Includes Tables, Fully Permissive RLS Policies (No Restrictions),
--- and Storage Bucket Policies for the "vida" Bucket.
+-- and Storage Bucket Policies for both 'vida' and '8ef9b60801823b2a8cab552d20959f50' Buckets.
 -- ====================================================================
 
 -- Enable UUID extension if not already enabled
@@ -20,6 +20,7 @@ create table if not exists public.categories (
 -- Enable RLS & Set Unrestricted Policies
 alter table public.categories enable row level security;
 
+drop policy if exists "Unrestricted Categories Access" on public.categories;
 create policy "Unrestricted Categories Access"
 on public.categories for all
 using (true)
@@ -45,6 +46,7 @@ create table if not exists public.products (
 -- Enable RLS & Set Unrestricted Policies
 alter table public.products enable row level security;
 
+drop policy if exists "Unrestricted Products Access" on public.products;
 create policy "Unrestricted Products Access"
 on public.products for all
 using (true)
@@ -67,6 +69,7 @@ create table if not exists public.featured_items (
 -- Enable RLS & Set Unrestricted Policies
 alter table public.featured_items enable row level security;
 
+drop policy if exists "Unrestricted Featured Items Access" on public.featured_items;
 create policy "Unrestricted Featured Items Access"
 on public.featured_items for all
 using (true)
@@ -87,6 +90,7 @@ create table if not exists public.orders (
 -- Enable RLS & Set Unrestricted Policies
 alter table public.orders enable row level security;
 
+drop policy if exists "Unrestricted Orders Access" on public.orders;
 create policy "Unrestricted Orders Access"
 on public.orders for all
 using (true)
@@ -107,6 +111,7 @@ create table if not exists public.order_items (
 -- Enable RLS & Set Unrestricted Policies
 alter table public.order_items enable row level security;
 
+drop policy if exists "Unrestricted Order Items Access" on public.order_items;
 create policy "Unrestricted Order Items Access"
 on public.order_items for all
 using (true)
@@ -130,6 +135,7 @@ on conflict (key) do nothing;
 -- Enable RLS & Set Unrestricted Policies
 alter table public.site_config enable row level security;
 
+drop policy if exists "Unrestricted Site Config Access" on public.site_config;
 create policy "Unrestricted Site Config Access"
 on public.site_config for all
 using (true)
@@ -137,7 +143,7 @@ with check (true);
 
 
 -- ====================================================================
--- 7. STORAGE BUCKET CONFIGURATION & UNRESTRICTED POLICIES ("vida" bucket)
+-- 7. STORAGE BUCKETS & COMPLETELY UNRESTRICTED POLICIES
 -- ====================================================================
 
 -- Ensure the public bucket "vida" exists
@@ -151,10 +157,21 @@ values (
 )
 on conflict (id) do nothing;
 
+-- Ensure the public bucket "8ef9b60801823b2a8cab552d20959f50" exists
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+    '8ef9b60801823b2a8cab552d20959f50', 
+    '8ef9b60801823b2a8cab552d20959f50', 
+    true, 
+    10485760, -- 10MB limit
+    array['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+)
+on conflict (id) do nothing;
+
 -- Ensure RLS is active on storage objects
 alter table storage.objects enable row level security;
 
--- Drop any previous restrictive storage policies for "vida" bucket if they exist
+-- Drop any previous restrictive storage policies for storage objects if they exist
 drop policy if exists "Allow public read access to images" on storage.objects;
 drop policy if exists "Allow authenticated admin upload" on storage.objects;
 drop policy if exists "Allow authenticated admin update" on storage.objects;
@@ -163,21 +180,25 @@ drop policy if exists "Unrestricted public read access to vida images" on storag
 drop policy if exists "Unrestricted public upload to vida bucket" on storage.objects;
 drop policy if exists "Unrestricted public update to vida bucket" on storage.objects;
 drop policy if exists "Unrestricted public delete to vida bucket" on storage.objects;
+drop policy if exists "Unrestricted public read access to all images" on storage.objects;
+drop policy if exists "Unrestricted public upload to all buckets" on storage.objects;
+drop policy if exists "Unrestricted public update to all buckets" on storage.objects;
+drop policy if exists "Unrestricted public delete to all buckets" on storage.objects;
 
--- Create completely open policies for anyone to view, upload, update, and delete in the "vida" bucket
-create policy "Unrestricted public read access to vida images"
+-- Create completely open policies for anyone to view, upload, update, and delete in ANY bucket
+create policy "Unrestricted public read access to all images"
 on storage.objects for select
-using ( bucket_id = 'vida' );
+using ( true );
 
-create policy "Unrestricted public upload to vida bucket"
+create policy "Unrestricted public upload to all buckets"
 on storage.objects for insert
-with check ( bucket_id = 'vida' );
+with check ( true );
 
-create policy "Unrestricted public update to vida bucket"
+create policy "Unrestricted public update to all buckets"
 on storage.objects for update
-using ( bucket_id = 'vida' )
-with check ( bucket_id = 'vida' );
+using ( true )
+with check ( true );
 
-create policy "Unrestricted public delete to vida bucket"
+create policy "Unrestricted public delete to all buckets"
 on storage.objects for delete
-using ( bucket_id = 'vida' );
+using ( true );

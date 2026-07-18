@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Package, Phone, Calendar, CheckCircle2, Clock, ChevronDown, Plus, Trash2, Edit3, X, Image as ImageIcon, LayoutGrid, ShoppingBag } from 'lucide-react';
 import { useStore, Product, Category } from '../lib/StoreContext';
 import ImageUpload from '../components/ImageUpload';
+import { supabase } from '../lib/supabase';
 
 interface OrderItem {
   id: number;
@@ -30,7 +31,7 @@ export default function AdminPage() {
   const [newCatImage, setNewCatImage] = useState('');
   const [newCatName, setNewCatName] = useState('');
 
-  // Mock orders since supabase is removed
+  // State for orders - load from localStorage as initial state, then fetch from Supabase if available
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const saved = localStorage.getItem('vida_orders');
@@ -41,7 +42,61 @@ export default function AdminPage() {
     }
   });
 
-  const updateOrderStatus = (orderId: number, status: Order['status']) => {
+  // Fetch real orders from Supabase if available
+  useEffect(() => {
+    if (!supabase) return;
+
+    const fetchOrders = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*, order_items(*)');
+        
+        if (!error && data) {
+          // Map to match local Order structure
+          const mappedOrders: Order[] = data.map((order: any) => ({
+            id: order.id,
+            created_at: order.created_at,
+            phone_number: order.phone_number,
+            total_price: Number(order.total_price),
+            status: order.status,
+            order_items: (order.order_items || []).map((item: any) => ({
+              id: item.id,
+              product_name: item.product_name,
+              quantity: item.quantity,
+              price: Number(item.price)
+            }))
+          }));
+
+          // Sort descending by id or date
+          const sorted = mappedOrders.sort((a, b) => b.id - a.id);
+          setOrders(sorted);
+          localStorage.setItem('vida_orders', JSON.stringify(sorted));
+        } else if (error) {
+          console.error("Supabase order fetch error:", error);
+        }
+      } catch (err) {
+        console.error("Failed to fetch orders from Supabase:", err);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
+  const updateOrderStatus = async (orderId: number, status: Order['status']) => {
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('orders')
+          .update({ status })
+          .eq('id', orderId);
+        
+        if (error) throw error;
+      } catch (err) {
+        console.error("Failed to update order status in Supabase:", err);
+      }
+    }
+
     const updated = orders.map(o => o.id === orderId ? { ...o, status } : o);
     setOrders(updated);
     try {
@@ -51,7 +106,20 @@ export default function AdminPage() {
     }
   };
 
-  const deleteOrder = (orderId: number) => {
+  const deleteOrder = async (orderId: number) => {
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('orders')
+          .delete()
+          .eq('id', orderId);
+        
+        if (error) throw error;
+      } catch (err) {
+        console.error("Failed to delete order from Supabase:", err);
+      }
+    }
+
     const updated = orders.filter(o => o.id !== orderId);
     setOrders(updated);
     try {

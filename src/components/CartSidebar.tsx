@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ShoppingBag, Trash2, Plus, Minus, ArrowRight, Loader2 } from 'lucide-react';
 import { useCart } from '../lib/CartContext';
 import { useTranslation } from '../lib/translations';
+import { supabase } from '../lib/supabase';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -25,23 +26,59 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
     setOrderError(null);
 
     try {
-      // Simulate real processing
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      let createdOrderId: number | string = Date.now();
+
+      // Submit to Supabase if client is initialized
+      if (supabase) {
+        // 1. Insert order parent record
+        const { data: orderData, error: orderErr } = await supabase
+          .from('orders')
+          .insert([{
+            phone_number: phoneNumber,
+            total_price: totalPrice,
+            status: 'pending'
+          }])
+          .select();
+
+        if (orderErr) throw orderErr;
+
+        if (orderData && orderData[0]) {
+          createdOrderId = orderData[0].id;
+          
+          // 2. Insert order child item records
+          const itemsToInsert = cart.map(item => ({
+            order_id: createdOrderId,
+            product_name: item.name,
+            quantity: item.quantity,
+            price: parseFloat(item.price.replace('$', ''))
+          }));
+
+          const { error: itemsErr } = await supabase
+            .from('order_items')
+            .insert(itemsToInsert);
+
+          if (itemsErr) throw itemsErr;
+        }
+      } else {
+        // Fallback: simulate database latency if Supabase is unavailable
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
 
       const newOrder = {
-        id: Date.now(),
+        id: createdOrderId,
         created_at: new Date().toISOString(),
         phone_number: phoneNumber,
         total_price: totalPrice,
-        status: 'pending',
-        order_items: cart.map(item => ({
+        status: 'pending' as const,
+        order_items: cart.map((item, index) => ({
+          id: index,
           product_name: item.name,
           quantity: item.quantity,
           price: parseFloat(item.price.replace('$', ''))
         }))
       };
 
-      // Store in local storage for admin access
+      // Store in local storage for admin access / dual-write redundancy
       let existingOrders = [];
       try {
         const saved = localStorage.getItem('vida_orders');

@@ -1,16 +1,18 @@
-import React, { useRef } from 'react';
-import { Upload, X, ImageIcon } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
+import { supabase, supabaseBucket } from '../lib/supabase';
 
 interface ImageUploadProps {
   value: string;
-  onChange: (base64: string) => void;
+  onChange: (url: string) => void;
   label?: string;
   className?: string;
 }
 
 export default function ImageUpload({ value, onChange, label, className = "" }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -18,11 +20,13 @@ export default function ImageUpload({ value, onChange, label, className = "" }: 
 
     setError(null);
 
-    // Accept up to 10MB since we compress it anyway on client side, which is much better for user experience!
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Image too large (max 10MB)");
+    // Accept up to 15MB since we compress it on the client side
+    if (file.size > 15 * 1024 * 1024) {
+      setError("Image too large (max 15MB)");
       return;
     }
+
+    setIsUploading(true);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -33,8 +37,8 @@ export default function ImageUpload({ value, onChange, label, className = "" }: 
           let width = img.width;
           let height = img.height;
 
-          // Scale down proportionally to a max of 800px
-          const MAX_DIMENSION = 800;
+          // Scale down proportionally to a max of 1200px for sharper display images
+          const MAX_DIMENSION = 1200;
           if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
             if (width > height) {
               height = Math.round((height * MAX_DIMENSION) / width);
@@ -50,28 +54,76 @@ export default function ImageUpload({ value, onChange, label, className = "" }: 
 
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            // Fallback if canvas context is not supported
-            onChange(event.target?.result as string);
-            return;
+            throw new Error("Could not get 2D canvas context");
           }
 
           ctx.drawImage(img, 0, 0, width, height);
 
-          // If PNG, keep PNG format to preserve transparency. If not, compress as JPEG
           const isPng = file.type === 'image/png' || file.name.endsWith('.png');
-          const dataUrl = isPng 
-            ? canvas.toDataURL('image/png') 
-            : canvas.toDataURL('image/jpeg', 0.75); // 0.75 quality is extremely compressed yet highly sharp!
+          const mimeType = isPng ? 'image/png' : 'image/jpeg';
+          const quality = isPng ? undefined : 0.85;
 
-          onChange(dataUrl);
+          // If Supabase is available, upload as a binary Blob
+          if (supabase) {
+            canvas.toBlob(async (blob) => {
+              if (!blob) {
+                setError("Error processing image file");
+                setIsUploading(false);
+                return;
+              }
+
+              try {
+                const ext = isPng ? 'png' : 'jpg';
+                const fileName = `images/${Date.now()}-${Math.random().toString(36).substring(2, 11)}.${ext}`;
+
+                // Upload to Supabase bucket
+                const { data, error: uploadError } = await supabase.storage
+                  .from(supabaseBucket)
+                  .upload(fileName, blob, {
+                    contentType: mimeType,
+                    cacheControl: '3600',
+                    upsert: true
+                  });
+
+                if (uploadError) {
+                  throw uploadError;
+                }
+
+                // Get public URL
+                const { data: { publicUrl } } = supabase.storage
+                  .from(supabaseBucket)
+                  .getPublicUrl(fileName);
+
+                onChange(publicUrl);
+              } catch (uploadErr: any) {
+                console.error("Supabase Storage upload failed, falling back to base64:", uploadErr);
+                // Fallback to base64 if upload fails
+                const dataUrl = isPng 
+                  ? canvas.toDataURL('image/png') 
+                  : canvas.toDataURL('image/jpeg', 0.75);
+                onChange(dataUrl);
+              } finally {
+                setIsUploading(false);
+              }
+            }, mimeType, quality);
+          } else {
+            // Fallback to base64 if Supabase is not initialized
+            const dataUrl = isPng 
+              ? canvas.toDataURL('image/png') 
+              : canvas.toDataURL('image/jpeg', 0.75);
+            onChange(dataUrl);
+            setIsUploading(false);
+          }
         } catch (err) {
-          console.error("Compression error, falling back to raw data URL:", err);
-          onChange(event.target?.result as string);
+          console.error("Compression/Upload error:", err);
+          setError("Error optimizing image");
+          setIsUploading(false);
         }
       };
 
       img.onerror = () => {
         setError("Error loading image file");
+        setIsUploading(false);
       };
 
       img.src = event.target?.result as string;
@@ -79,6 +131,7 @@ export default function ImageUpload({ value, onChange, label, className = "" }: 
 
     reader.onerror = () => {
       setError("Error reading file");
+      setIsUploading(false);
     };
 
     reader.readAsDataURL(file);
@@ -101,8 +154,8 @@ export default function ImageUpload({ value, onChange, label, className = "" }: 
       )}
       
       <div 
-        onClick={() => fileInputRef.current?.click()}
-        className="relative group cursor-pointer border-2 border-dashed border-brand-primary/10 hover:border-brand-accent/40 rounded-2xl transition-all aspect-video overflow-hidden bg-white flex flex-col items-center justify-center p-4"
+        onClick={() => !isUploading && fileInputRef.current?.click()}
+        className={`relative group cursor-pointer border-2 border-dashed border-brand-primary/10 hover:border-brand-accent/40 rounded-2xl transition-all aspect-video overflow-hidden bg-white flex flex-col items-center justify-center p-4 ${isUploading ? 'opacity-80' : ''}`}
       >
         <input 
           type="file"
@@ -110,9 +163,17 @@ export default function ImageUpload({ value, onChange, label, className = "" }: 
           onChange={handleFileChange}
           accept="image/*"
           className="absolute inset-0 opacity-0 cursor-pointer -z-10"
+          disabled={isUploading}
         />
 
-        {value ? (
+        {isUploading ? (
+          <div className="flex flex-col items-center gap-2 text-brand-accent">
+            <Loader2 className="animate-spin" size={32} />
+            <span className="text-[10px] uppercase tracking-widest font-black">
+              Uploading to Storage...
+            </span>
+          </div>
+        ) : value ? (
           <>
             <img 
               src={value} 

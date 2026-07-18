@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { supabase } from './supabase';
 
 export type Language = 'en' | 'ar' | 'kr';
 
@@ -465,10 +466,105 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem('vida_hero_image') || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=2000';
   });
 
+  // Real-time synchronization with Supabase
+  useEffect(() => {
+    if (!supabase) return;
+
+    const loadData = async () => {
+      try {
+        // 1. Load Categories
+        const { data: catData, error: catErr } = await supabase.from('categories').select('*');
+        if (!catErr && catData) {
+          if (catData.length === 0) {
+            // Seed initial categories
+            const { data: seededCats } = await supabase.from('categories').insert(
+              INITIAL_CATEGORIES.map(({ id, ...rest }) => rest)
+            ).select();
+            if (seededCats) {
+              setCategories(seededCats.map((c: any) => ({ ...c, id: c.id.toString() })));
+            }
+          } else {
+            setCategories(catData.map((c: any) => ({ ...c, id: c.id.toString() })));
+          }
+        }
+
+        // 2. Load Products
+        const { data: prodData, error: prodErr } = await supabase.from('products').select('*');
+        if (!prodErr && prodData) {
+          if (prodData.length === 0) {
+            // Seed initial products
+            const { data: seededProds } = await supabase.from('products').insert(
+              INITIAL_PRODUCTS.map(({ id, ...rest }) => ({
+                name: rest.name,
+                category: rest.category,
+                price: rest.price,
+                image: rest.image,
+                images: rest.images,
+                localized_images: rest.localizedImages,
+                description: rest.description,
+                benefits: rest.benefits
+              }))
+            ).select();
+            if (seededProds) {
+              setProducts(seededProds.map((p: any) => ({
+                id: p.id.toString(),
+                name: p.name,
+                category: p.category,
+                price: p.price,
+                image: p.image,
+                images: p.images || [],
+                localizedImages: p.localized_images,
+                description: p.description,
+                benefits: p.benefits || []
+              })));
+            }
+          } else {
+            setProducts(prodData.map((p: any) => ({
+              id: p.id.toString(),
+              name: p.name,
+              category: p.category,
+              price: p.price,
+              image: p.image,
+              images: p.images || [],
+              localizedImages: p.localized_images,
+              description: p.description,
+              benefits: p.benefits || []
+            })));
+          }
+        }
+
+        // 3. Load Featured Items
+        const { data: featData, error: featErr } = await supabase.from('featured_items').select('*');
+        if (!featErr && featData) {
+          if (featData.length === 0) {
+            // Seed initial featured
+            const { data: seededFeat } = await supabase.from('featured_items').insert(
+              INITIAL_FEATURED.map(({ id, ...rest }) => rest)
+            ).select();
+            if (seededFeat) {
+              setFeaturedItems(seededFeat.map((f: any) => ({ ...f, id: f.id.toString() })));
+            }
+          } else {
+            setFeaturedItems(featData.map((f: any) => ({ ...f, id: f.id.toString() })));
+          }
+        }
+
+        // 4. Load Hero Image
+        const { data: configData } = await supabase.from('site_config').select('*').eq('key', 'hero_image').single();
+        if (configData && configData.value) {
+          setHeroImage(configData.value);
+        }
+      } catch (e) {
+        console.error("Error loading data from Supabase:", e);
+      }
+    };
+
+    loadData();
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem('vida_lang', language);
-      // Force set direction for RTL languages
       document.documentElement.dir = language === 'ar' || language === 'kr' ? 'rtl' : 'ltr';
     } catch (e) {
       console.error("Failed to save language to localStorage:", e);
@@ -507,42 +603,211 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [heroImage]);
 
-  const addProduct = (product: Omit<Product, 'id'>) => {
+  const addProduct = async (product: Omit<Product, 'id'>) => {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .insert([{
+            name: product.name,
+            category: product.category,
+            price: product.price,
+            image: product.image,
+            images: product.images,
+            localized_images: product.localizedImages,
+            description: product.description,
+            benefits: product.benefits
+          }])
+          .select();
+
+        if (error) throw error;
+        if (data && data[0]) {
+          const mappedProduct = {
+            id: data[0].id.toString(),
+            name: data[0].name,
+            category: data[0].category,
+            price: data[0].price,
+            image: data[0].image,
+            images: data[0].images || [],
+            localizedImages: data[0].localized_images,
+            description: data[0].description,
+            benefits: data[0].benefits || []
+          };
+          setProducts((prev) => [...prev, mappedProduct]);
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to add product to Supabase:", e);
+      }
+    }
     const newProduct = { ...product, id: Date.now().toString() };
     setProducts((prev) => [...prev, newProduct]);
   };
 
-  const updateProduct = (id: string, product: Partial<Product>) => {
+  const updateProduct = async (id: string, product: Partial<Product>) => {
+    if (supabase) {
+      try {
+        const payload: any = {};
+        if (product.name !== undefined) payload.name = product.name;
+        if (product.category !== undefined) payload.category = product.category;
+        if (product.price !== undefined) payload.price = product.price;
+        if (product.image !== undefined) payload.image = product.image;
+        if (product.images !== undefined) payload.images = product.images;
+        if (product.localizedImages !== undefined) payload.localized_images = product.localizedImages;
+        if (product.description !== undefined) payload.description = product.description;
+        if (product.benefits !== undefined) payload.benefits = product.benefits;
+
+        const { error } = await supabase
+          .from('products')
+          .update(payload)
+          .eq('id', id);
+
+        if (error) throw error;
+      } catch (e) {
+        console.error("Failed to update product in Supabase:", e);
+      }
+    }
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...product } : p)));
   };
 
-  const deleteProduct = (id: string) => {
+  const deleteProduct = async (id: string) => {
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('products')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+      } catch (e) {
+        console.error("Failed to delete product from Supabase:", e);
+      }
+    }
     setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const addCategory = (name: string, image?: string) => {
+  const addCategory = async (name: string, image?: string) => {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .insert([{ name, image }])
+          .select();
+        if (error) throw error;
+        if (data && data[0]) {
+          setCategories((prev) => [...prev, { id: data[0].id.toString(), name: data[0].name, image: data[0].image }]);
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to add category to Supabase:", e);
+      }
+    }
     setCategories((prev) => [...prev, { id: Date.now().toString(), name, image }]);
   };
 
-  const updateCategory = (id: string, name: string, image?: string) => {
+  const updateCategory = async (id: string, name: string, image?: string) => {
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('categories')
+          .update({ name, image })
+          .eq('id', id);
+        if (error) throw error;
+      } catch (e) {
+        console.error("Failed to update category in Supabase:", e);
+      }
+    }
     setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name, image } : c)));
   };
 
-  const deleteCategory = (id: string) => {
+  const deleteCategory = async (id: string) => {
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('categories')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+      } catch (e) {
+        console.error("Failed to delete category from Supabase:", e);
+      }
+    }
     setCategories((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const addFeaturedItem = (item: Omit<FeaturedItem, 'id'>) => {
+  const addFeaturedItem = async (item: Omit<FeaturedItem, 'id'>) => {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('featured_items')
+          .insert([{
+            title: item.title,
+            name: item.name,
+            description: item.description,
+            image: item.image,
+            accent: item.accent
+          }])
+          .select();
+        if (error) throw error;
+        if (data && data[0]) {
+          setFeaturedItems((prev) => [...prev, { id: data[0].id.toString(), ...item }]);
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to add featured item to Supabase:", e);
+      }
+    }
     const newItem = { ...item, id: Date.now().toString() };
     setFeaturedItems((prev) => [...prev, newItem]);
   };
 
-  const updateFeaturedItem = (id: string, item: Partial<FeaturedItem>) => {
+  const updateFeaturedItem = async (id: string, item: Partial<FeaturedItem>) => {
+    if (supabase) {
+      try {
+        const payload: any = {};
+        if (item.title !== undefined) payload.title = item.title;
+        if (item.name !== undefined) payload.name = item.name;
+        if (item.description !== undefined) payload.description = item.description;
+        if (item.image !== undefined) payload.image = item.image;
+        if (item.accent !== undefined) payload.accent = item.accent;
+
+        const { error } = await supabase
+          .from('featured_items')
+          .update(payload)
+          .eq('id', id);
+        if (error) throw error;
+      } catch (e) {
+        console.error("Failed to update featured item in Supabase:", e);
+      }
+    }
     setFeaturedItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...item } : i)));
   };
 
-  const deleteFeaturedItem = (id: string) => {
+  const deleteFeaturedItem = async (id: string) => {
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('featured_items')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+      } catch (e) {
+        console.error("Failed to delete featured item from Supabase:", e);
+      }
+    }
     setFeaturedItems((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const handleSetHeroImage = async (url: string) => {
+    setHeroImage(url);
+    if (supabase) {
+      try {
+        await supabase
+          .from('site_config')
+          .upsert({ key: 'hero_image', value: url });
+      } catch (e) {
+        console.error("Failed to save hero_image to Supabase:", e);
+      }
+    }
   };
 
   return (
@@ -563,7 +828,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         updateFeaturedItem,
         deleteFeaturedItem,
         heroImage,
-        setHeroImage,
+        setHeroImage: handleSetHeroImage,
       }}
     >
       {children}

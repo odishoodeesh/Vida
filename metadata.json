@@ -1,0 +1,8 @@
+{
+  "name": "Remix: VIDA Botanical",
+  "description": "A minimal, clean, and elegant botanical skincare and lifestyle brand experience.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

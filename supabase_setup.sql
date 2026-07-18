@@ -168,10 +168,11 @@ values (
 )
 on conflict (id) do nothing;
 
--- Ensure RLS is active on storage objects
-alter table storage.objects enable row level security;
+-- Note: We DO NOT run `alter table storage.objects enable row level security;`
+-- because RLS is already pre-enabled on storage.objects by default.
+-- Attempting to run ALTER on system storage tables will trigger ownership errors.
 
--- Drop any previous restrictive storage policies for storage objects if they exist
+-- Drop any previous storage policies for storage objects if they exist
 drop policy if exists "Allow public read access to images" on storage.objects;
 drop policy if exists "Allow authenticated admin upload" on storage.objects;
 drop policy if exists "Allow authenticated admin update" on storage.objects;

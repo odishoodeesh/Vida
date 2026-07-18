@@ -1,5 +1,3 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-
 type PagesFunction<Env = any> = (context: {
   request: Request;
   env: Env;
@@ -17,6 +15,7 @@ interface Env {
   AWS_S3_SECRET_ACCESS_KEY?: string;
   AWS_S3_BUCKET?: string;
   VITE_SUPABASE_URL?: string;
+  VITE_SUPABASE_ANON_KEY?: string;
 }
 
 const corsHeaders = {
@@ -46,7 +45,7 @@ VIDA's botanical product list is:
 15. Fenugreek Oil ($34) - Specialty Care. Focus: Follicle nourishment, reducing thinning hair.
 16. Peppermint Oil ($32) - Specialty Care. Focus: Cooling sensation, refreshing scalp, energy boost.
 17. Watercress Oil ($38) - Gold Collection. Focus: Revitalizing dull/tired complexions, deep nutrition.
-18. Pumpkin Seed Oil ($36) - Deep Moisture. Focus: Hair density, softening mature skin, restorative lipids.
+18. Pumpkin Seed Oil ($36) - Deep Moisture. Focus: Hair density, softening luxury skin, restorative lipids.
 19. Sesame Oil ($32) - Deep Moisture. Focus: Warming oil, antioxidant envelope.
 
 Rules for your tone & recommendations:
@@ -91,51 +90,46 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         });
       }
 
-      const s3Region = env.AWS_S3_REGION || "ap-south-1";
-      const s3Endpoint = env.AWS_S3_ENDPOINT;
-      const s3AccessKeyId = env.AWS_S3_ACCESS_KEY_ID;
-      const s3SecretAccessKey = env.AWS_S3_SECRET_ACCESS_KEY;
-      const s3Bucket = env.AWS_S3_BUCKET || "vida";
-
-      if (!s3Endpoint || !s3AccessKeyId || !s3SecretAccessKey) {
-        // Fallback: return base64 back on the client if S3 is not configured
-        return new Response(JSON.stringify({ publicUrl: base64Data }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Convert base64 string to Buffer / ArrayBuffer for S3 upload
-      const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
-      const binaryString = atob(base64Clean);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      const s3Client = new S3Client({
-        region: s3Region,
-        endpoint: s3Endpoint,
-        credentials: {
-          accessKeyId: s3AccessKeyId,
-          secretAccessKey: s3SecretAccessKey,
-        },
-        forcePathStyle: true,
-      });
-
-      const uploadPath = fileName.startsWith("images/") ? fileName : `images/${fileName}`;
-      const command = new PutObjectCommand({
-        Bucket: s3Bucket,
-        Key: uploadPath,
-        Body: bytes,
-        ContentType: mimeType || "image/jpeg",
-      });
-
-      await s3Client.send(command);
-
       const supabaseUrl = (env.VITE_SUPABASE_URL || "https://jyjtixllqqukiquxdpve.supabase.co").replace(/\/$/, "");
-      const publicUrl = `${supabaseUrl}/storage/v1/object/public/${s3Bucket}/${uploadPath}`;
+      const supabaseKey = env.VITE_SUPABASE_ANON_KEY;
+      const bucket = env.AWS_S3_BUCKET || "vida";
+      const uploadPath = fileName.startsWith("images/") ? fileName : `images/${fileName}`;
 
-      return new Response(JSON.stringify({ publicUrl }), {
+      // If Supabase credentials exist, upload using native high-performance REST API
+      if (supabaseUrl && supabaseKey) {
+        // Convert base64 data to ArrayBuffer
+        const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
+        const binaryString = atob(base64Clean);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucket}/${uploadPath}`;
+        
+        const uploadResponse = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${supabaseKey}`,
+            "apikey": supabaseKey,
+            "Content-Type": mimeType || "image/jpeg",
+          },
+          body: bytes,
+        });
+
+        if (uploadResponse.ok) {
+          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${uploadPath}`;
+          return new Response(JSON.stringify({ publicUrl }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } else {
+          const errText = await uploadResponse.text();
+          throw new Error(`Supabase Storage REST upload failed: ${errText}`);
+        }
+      }
+
+      // Fallback: return base64 back on the client if Supabase is not fully configured
+      return new Response(JSON.stringify({ publicUrl: base64Data }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     } catch (err: any) {

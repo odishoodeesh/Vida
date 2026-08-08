@@ -10,9 +10,10 @@ import { ShoppingBag, Globe } from 'lucide-react';
 interface NavbarProps {
   onCartClick: () => void;
   onMenuClick: () => void;
+  isMenuOpen?: boolean;
 }
 
-export default function Navbar({ onCartClick, onMenuClick }: NavbarProps) {
+export default function Navbar({ onCartClick, onMenuClick, isMenuOpen }: NavbarProps) {
   const { totalItems } = useCart();
   const { language, setLanguage } = useStore();
   const { t } = useTranslation();
@@ -124,10 +125,14 @@ export default function Navbar({ onCartClick, onMenuClick }: NavbarProps) {
           <button 
             onClick={onMenuClick}
             className="text-brand-primary p-2 hover:bg-brand-primary/5 rounded-xl transition-all cursor-pointer"
-            aria-label="Open menu"
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 8h16M4 16h16" />
+            <svg className="w-6 h-6 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 8h16M4 16h16" />
+              )}
             </svg>
           </button>
         </div>

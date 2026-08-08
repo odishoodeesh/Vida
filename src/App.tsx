@@ -29,8 +29,9 @@ export default function App() {
           <ScrollToTop />
           <main className="min-h-screen bg-brand-paper font-sans">
             <Navbar 
-              onCartClick={() => setIsCartOpen(true)} 
-              onMenuClick={() => setIsMenuOpen(true)} 
+              onCartClick={() => setIsCartOpen(prev => !prev)} 
+              onMenuClick={() => setIsMenuOpen(prev => !prev)} 
+              isMenuOpen={isMenuOpen}
             />
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
             <MobileMenu 

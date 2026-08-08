@@ -338,7 +338,7 @@ async function startServer() {
     app.use(vite.middlewares);
 
     // SPA fallback route for dev mode (serves index.html for client routes like /collection, /about, etc.)
-    app.use("*", async (req, res, next) => {
+    app.get("*", async (req, res, next) => {
       if (req.originalUrl.startsWith("/api")) {
         return next();
       }
@@ -356,6 +356,9 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
+      if (req.originalUrl.startsWith('/api')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

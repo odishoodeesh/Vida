@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Package, Phone, Calendar, CheckCircle2, Clock, ChevronDown, Plus, Trash2, Edit3, X, Image as ImageIcon, LayoutGrid, ShoppingBag } from 'lucide-react';
+import { Package, Phone, Calendar, CheckCircle2, Clock, ChevronDown, Plus, Trash2, Edit3, X, Image as ImageIcon, LayoutGrid, ShoppingBag, Lock, LogOut } from 'lucide-react';
 import { useStore, Product, Category } from '../lib/StoreContext';
 import ImageUpload from '../components/ImageUpload';
 import { supabase } from '../lib/supabase';
@@ -30,6 +30,42 @@ export default function AdminPage() {
   const [editingSlider, setEditingSlider] = useState<any | null>(null);
   const [newCatImage, setNewCatImage] = useState('');
   const [newCatName, setNewCatName] = useState('');
+
+  // Password authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('vida_admin_auth') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === 'vida.organic@admin') {
+      setIsAuthenticated(true);
+      try {
+        sessionStorage.setItem('vida_admin_auth', 'true');
+      } catch (e) {
+        console.error('Session storage error:', e);
+      }
+      setPasswordError('');
+      setPasswordInput('');
+    } else {
+      setPasswordError('Invalid password. Access denied.');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    try {
+      sessionStorage.removeItem('vida_admin_auth');
+    } catch (e) {
+      console.error('Session storage error:', e);
+    }
+  };
 
   // State for orders - load from localStorage as initial state, then fetch from Supabase if available
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -129,18 +165,90 @@ export default function AdminPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen pt-32 pb-24 px-6 bg-brand-paper">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-16 flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen pt-28 pb-16 px-4 sm:px-6 bg-brand-paper flex items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white rounded-[24px] sm:rounded-[32px] p-6 sm:p-10 border border-brand-primary/10 shadow-xl text-center space-y-6"
+        >
+          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-brand-primary/5 text-brand-gold rounded-full flex items-center justify-center mx-auto">
+            <Lock size={24} className="sm:w-7 sm:h-7" />
+          </div>
+
           <div>
-            <h1 className="text-5xl font-serif text-brand-primary italic mb-4">Studio Control</h1>
-            <div className="flex gap-8">
+            <h1 className="text-xl sm:text-2xl font-serif text-brand-primary italic mb-1 sm:mb-2">Studio Control</h1>
+            <p className="text-[9px] sm:text-[10px] uppercase tracking-widest font-black text-brand-primary/40">Restricted Administration Access</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2 text-left">
+              <label className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40 px-1">
+                Password
+              </label>
+              <input 
+                type="password"
+                required
+                autoFocus
+                value={passwordInput}
+                onChange={(e) => {
+                  setPasswordInput(e.target.value);
+                  if (passwordError) setPasswordError('');
+                }}
+                placeholder="Enter admin password..."
+                className="w-full bg-brand-paper border border-brand-primary/10 rounded-xl px-4 py-3.5 text-sm font-mono text-brand-primary outline-none focus:ring-2 ring-brand-accent/30 transition-all"
+              />
+            </div>
+
+            {passwordError && (
+              <p className="text-xs text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 font-medium">
+                {passwordError}
+              </p>
+            )}
+
+            <button 
+              type="submit"
+              className="w-full bg-brand-primary text-white py-3.5 sm:py-4 rounded-xl text-xs uppercase tracking-widest font-black hover:bg-brand-accent transition-colors shadow-lg shadow-brand-primary/10"
+            >
+              Authenticate
+            </button>
+          </form>
+
+          <div className="pt-4 border-t border-brand-primary/5">
+            <a 
+              href="/" 
+              className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40 hover:text-brand-primary transition-colors"
+            >
+              ← Return to Storefront
+            </a>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen pt-24 sm:pt-32 pb-20 sm:pb-24 px-3 sm:px-6 bg-brand-paper">
+      <div className="max-w-6xl mx-auto">
+        <header className="mb-8 sm:mb-16 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 sm:gap-8">
+          <div className="w-full md:w-auto">
+            <div className="flex items-center justify-between sm:justify-start gap-4 mb-4">
+              <h1 className="text-3xl sm:text-5xl font-serif text-brand-primary italic">Studio Control</h1>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-black text-brand-primary/40 hover:text-red-600 transition-colors bg-white px-3 py-1.5 rounded-lg border border-brand-primary/10"
+                title="Log Out"
+              >
+                <LogOut size={12} /> Exit
+              </button>
+            </div>
+            <div className="flex gap-4 sm:gap-8 overflow-x-auto max-w-full pb-2 scrollbar-none whitespace-nowrap">
               {(['orders', 'products', 'categories', 'sliders', 'site'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`text-[10px] uppercase tracking-[0.2em] font-black transition-all pb-2 border-b-2 ${
+                  className={`text-[10px] uppercase tracking-[0.2em] font-black transition-all pb-2 border-b-2 shrink-0 ${
                     activeTab === tab ? 'border-brand-accent text-brand-primary' : 'border-transparent text-brand-primary/30'
                   }`}
                 >
@@ -150,11 +258,11 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-3 w-full sm:w-auto">
             {activeTab === 'products' && (
               <button 
                 onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }}
-                className="flex items-center gap-2 bg-brand-primary text-white px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand-primary text-white px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors"
               >
                 <Plus size={14} /> Add Product
               </button>
@@ -163,7 +271,7 @@ export default function AdminPage() {
             {activeTab === 'sliders' && (
               <button 
                 onClick={() => { setEditingSlider(null); setIsSliderModalOpen(true); }}
-                className="flex items-center gap-2 bg-brand-primary text-white px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand-primary text-white px-5 py-3 rounded-xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors"
               >
                 <Plus size={14} /> Add Slide
               </button>
@@ -220,10 +328,10 @@ export default function AdminPage() {
               exit={{ opacity: 0, y: -20 }}
               className="max-w-4xl"
             >
-              <div className="bg-white rounded-[40px] p-10 border border-brand-primary/5 space-y-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-end">
-                  <div className="space-y-6">
-                    <h3 className="text-xl font-serif text-brand-primary italic">Inscribe New Collection</h3>
+              <div className="bg-white rounded-[24px] sm:rounded-[40px] p-5 sm:p-10 border border-brand-primary/5 space-y-8 sm:space-y-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10 items-end">
+                  <div className="space-y-4 sm:space-y-6">
+                    <h3 className="text-lg sm:text-xl font-serif text-brand-primary italic">Inscribe New Collection</h3>
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <label className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40 px-1">Collection Name</label>
@@ -232,7 +340,7 @@ export default function AdminPage() {
                           placeholder="e.g. Pure Essence"
                           value={newCatName}
                           onChange={(e) => setNewCatName(e.target.value)}
-                          className="w-full bg-brand-paper rounded-xl px-6 py-4 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 ring-brand-accent/20"
+                          className="w-full bg-brand-paper rounded-xl px-4 sm:px-6 py-3.5 sm:py-4 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 ring-brand-accent/20"
                         />
                       </div>
                       <ImageUpload 
@@ -250,15 +358,15 @@ export default function AdminPage() {
                         setNewCatImage('');
                       }
                     }}
-                    className="bg-brand-primary text-white h-[60px] rounded-2xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors shadow-xl shadow-brand-primary/10"
+                    className="w-full bg-brand-primary text-white h-[50px] sm:h-[60px] rounded-2xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors shadow-xl shadow-brand-primary/10"
                   >
                     Found Collection
                   </button>
                 </div>
 
-                <div className="space-y-6 pt-10 border-t border-brand-primary/5">
+                <div className="space-y-6 pt-8 sm:pt-10 border-t border-brand-primary/5">
                   <h3 className="text-[10px] uppercase tracking-[0.2em] font-black text-brand-primary/40 mb-4">Manage Collections</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                     {categories.map((cat) => (
                       <CategoryCard 
                         key={cat.id} 
@@ -278,11 +386,11 @@ export default function AdminPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
             >
               {featuredItems.map((item) => (
-                <div key={item.id} className="bg-white rounded-3xl p-6 border border-brand-primary/5 flex gap-4 group relative">
-                  <div className="w-20 h-24 bg-brand-paper rounded-xl overflow-hidden flex-shrink-0">
+                <div key={item.id} className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-brand-primary/5 flex gap-3 sm:gap-4 group relative">
+                  <div className="w-16 h-20 sm:w-20 sm:h-24 bg-brand-paper rounded-xl overflow-hidden flex-shrink-0">
                     <img src={item.image} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <div className="flex-grow flex flex-col justify-between">
@@ -290,20 +398,20 @@ export default function AdminPage() {
                       <h3 className="font-serif text-brand-primary italic leading-tight mb-1">{item.name}</h3>
                       <p className="text-[8px] uppercase tracking-widest font-black text-brand-gold line-clamp-1">{item.title}</p>
                     </div>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mt-2">
                       <span className="text-[10px] uppercase tracking-widest font-medium opacity-40">{item.accent}</span>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1.5">
                         <button 
                           onClick={() => { setEditingSlider(item); setIsSliderModalOpen(true); }}
-                          className="p-2 hover:bg-brand-paper rounded-lg text-brand-primary transition-colors"
+                          className="p-1.5 hover:bg-brand-paper rounded-lg text-brand-primary transition-colors"
                         >
-                          <Edit3 size={16} />
+                          <Edit3 size={15} />
                         </button>
                         <button 
                           onClick={() => deleteFeaturedItem(item.id)}
-                          className="p-2 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                          className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </div>
@@ -320,9 +428,9 @@ export default function AdminPage() {
               exit={{ opacity: 0, y: -20 }}
               className="max-w-xl"
             >
-              <div className="bg-white rounded-[40px] p-10 border border-brand-primary/5 space-y-8">
+              <div className="bg-white rounded-[24px] sm:rounded-[40px] p-5 sm:p-10 border border-brand-primary/5 space-y-6 sm:space-y-8">
                 <div>
-                  <h3 className="text-xl font-serif text-brand-primary italic mb-2">Home Page Aesthetics</h3>
+                  <h3 className="text-lg sm:text-xl font-serif text-brand-primary italic mb-1 sm:mb-2">Home Page Aesthetics</h3>
                   <p className="text-[10px] uppercase tracking-widest font-black text-brand-primary/30">Set the visual mood for your storefront</p>
                 </div>
                 
@@ -344,7 +452,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-brand-primary/5">
+                <div className="pt-4 sm:pt-6 border-t border-brand-primary/5">
                   <p className="text-[9px] text-brand-primary/40 italic">Note: High-resolution vertical or panoramic images work best for the hero section.</p>
                 </div>
               </div>
@@ -403,15 +511,15 @@ function SliderFormModal({ editingSlider, onClose, onSave }: {
   });
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-      <div className="absolute inset-0 bg-brand-primary/40 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 bg-brand-primary/40 backdrop-blur-sm" onClick={onClose} />
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-2xl bg-brand-paper rounded-[40px] shadow-2xl overflow-hidden flex flex-col"
+        className="relative w-full max-w-2xl bg-brand-paper rounded-[24px] sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col my-auto max-h-[90vh]"
       >
-        <div className="p-8 border-b border-brand-primary/5 flex justify-between items-center">
-          <h2 className="text-2xl font-serif text-brand-primary italic">
+        <div className="p-5 sm:p-8 border-b border-brand-primary/5 flex justify-between items-center shrink-0">
+          <h2 className="text-xl sm:text-2xl font-serif text-brand-primary italic">
             {editingSlider ? 'Edit Slide' : 'New Home Slide'}
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-brand-primary/5 rounded-full transition-colors">
@@ -419,8 +527,8 @@ function SliderFormModal({ editingSlider, onClose, onSave }: {
           </button>
         </div>
 
-        <div className="p-10 space-y-6">
-          <div className="grid grid-cols-2 gap-6">
+        <div className="p-5 sm:p-10 space-y-5 sm:space-y-6 overflow-y-auto flex-grow">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40 px-1">Display Name</label>
               <input 
@@ -481,11 +589,11 @@ function SliderFormModal({ editingSlider, onClose, onSave }: {
           </div>
         </div>
 
-        <div className="p-8 bg-brand-paper border-t border-brand-primary/5 flex justify-end gap-4">
-          <button onClick={onClose} className="px-8 py-4 text-[10px] uppercase tracking-widest font-black text-brand-primary/40 hover:text-brand-primary transition-colors">Cancel</button>
+        <div className="p-4 sm:p-8 bg-brand-paper border-t border-brand-primary/5 flex justify-end gap-3 sm:gap-4 shrink-0">
+          <button onClick={onClose} className="px-5 sm:px-8 py-3.5 sm:py-4 text-[10px] uppercase tracking-widest font-black text-brand-primary/40 hover:text-brand-primary transition-colors">Cancel</button>
           <button 
             onClick={() => onSave(formData)}
-            className="bg-brand-primary text-white px-12 py-4 rounded-xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors"
+            className="bg-brand-primary text-white px-8 sm:px-12 py-3.5 sm:py-4 rounded-xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors"
           >
             Save Slide
           </button>
@@ -508,47 +616,47 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onDelete }
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-[32px] p-8 border border-brand-primary/5 shadow-sm hover:shadow-md transition-shadow relative group"
+      className="bg-white rounded-[24px] sm:rounded-[32px] p-4 sm:p-8 border border-brand-primary/5 shadow-sm hover:shadow-md transition-shadow relative group"
     >
       {!isConfirmingDelete ? (
         <button 
           onClick={() => setIsConfirmingDelete(true)}
-          className="absolute top-8 right-8 p-2 text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-4 right-4 sm:top-8 sm:right-8 p-2 text-red-300 hover:text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
         >
           <Trash2 size={16} />
         </button>
       ) : (
-        <div className="absolute top-8 right-8 flex items-center gap-2 bg-red-50 px-3 py-1 rounded-lg border border-red-100 z-10">
+        <div className="absolute top-4 right-4 sm:top-8 sm:right-8 flex items-center gap-2 bg-red-50 px-3 py-1 rounded-lg border border-red-100 z-10">
           <span className="text-[8px] uppercase font-black text-red-600">Delete?</span>
           <button onClick={() => onDelete(order.id)} className="text-[8px] font-black text-red-600 hover:underline">Yes</button>
           <button onClick={() => setIsConfirmingDelete(false)} className="text-[8px] font-black text-brand-primary/40">No</button>
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row justify-between gap-8">
-        <div className="flex-grow space-y-6">
-          <div className="flex flex-wrap items-center gap-6">
+      <div className="flex flex-col lg:flex-row justify-between gap-6 sm:gap-8">
+        <div className="flex-grow space-y-4 sm:space-y-6">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-6 pr-8 sm:pr-0">
             <div className="flex items-center gap-2 text-brand-primary">
-              <Phone size={16} />
-              <span className="font-mono text-lg">{order.phone_number}</span>
+              <Phone size={14} className="sm:w-4 sm:h-4" />
+              <span className="font-mono text-base sm:text-lg">{order.phone_number}</span>
             </div>
-            <div className="flex items-center gap-2 text-brand-secondary text-xs uppercase tracking-widest">
-              <Calendar size={14} />
+            <div className="flex items-center gap-2 text-brand-secondary text-[10px] sm:text-xs uppercase tracking-widest">
+              <Calendar size={12} className="sm:w-3.5 sm:h-3.5" />
               {new Date(order.created_at).toLocaleDateString()}
             </div>
-            <div className="px-4 py-1.5 rounded-full bg-brand-beige text-brand-primary text-[10px] uppercase tracking-widest font-black">
+            <div className="px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-brand-beige text-brand-primary text-[9px] sm:text-[10px] uppercase tracking-widest font-black">
               #{order.id}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {order.order_items.map((item, i) => (
-              <div key={i} className="flex justify-between items-center bg-brand-paper/50 p-4 rounded-xl border border-brand-primary/5">
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 flex items-center justify-center bg-brand-primary text-white text-[10px] rounded-md font-bold">
+              <div key={i} className="flex justify-between items-center bg-brand-paper/50 p-3 sm:p-4 rounded-xl border border-brand-primary/5">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                  <span className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center bg-brand-primary text-white text-[9px] sm:text-[10px] rounded-md font-bold">
                     {item.quantity}
                   </span>
-                  <span className="text-sm font-serif italic text-brand-primary">{item.product_name}</span>
+                  <span className="text-xs sm:text-sm font-serif italic text-brand-primary">{item.product_name}</span>
                 </div>
                 <span className="text-[10px] font-mono text-brand-primary/40">${item.price}</span>
               </div>
@@ -556,17 +664,17 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onDelete }
           </div>
         </div>
 
-        <div className="lg:w-64 flex flex-col justify-between items-end gap-6">
-          <div className="text-right">
-            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-brand-primary/40 mb-1">Order Status</p>
+        <div className="lg:w-64 flex flex-row lg:flex-col justify-between items-end sm:items-center lg:items-end gap-4 sm:gap-6 pt-4 lg:pt-0 border-t lg:border-t-0 border-brand-primary/5">
+          <div className="text-left lg:text-right">
+            <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] font-black text-brand-primary/40 mb-1">Order Status</p>
             <div className="relative group/status">
-              <button className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest font-black transition-colors ${
+              <button className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-[9px] sm:text-[10px] uppercase tracking-widest font-black transition-colors ${
                 order.status === 'completed' ? 'bg-green-50 text-green-700' : 
                 order.status === 'cancelled' ? 'bg-red-50 text-red-700' : 'bg-brand-primary text-white'
               }`}>
                 {order.status} <ChevronDown size={14} />
               </button>
-              <div className="absolute top-full right-0 mt-2 bg-white rounded-2xl shadow-xl border border-brand-primary/5 p-2 hidden group-hover/status:block z-20 w-40">
+              <div className="absolute top-full left-0 lg:left-auto lg:right-0 mt-2 bg-white rounded-2xl shadow-xl border border-brand-primary/5 p-2 hidden group-hover/status:block z-20 w-40">
                 {(['pending', 'completed', 'cancelled'] as const).map(s => (
                   <button 
                     key={s}
@@ -580,8 +688,8 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onUpdateStatus, onDelete }
             </div>
           </div>
           <div className="text-right">
-            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-brand-primary/40 mb-1">Total Amount</p>
-            <p className="text-3xl font-sans font-light text-brand-primary tracking-tight">${order.total_price.toFixed(2)}</p>
+            <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] font-black text-brand-primary/40 mb-1">Total Amount</p>
+            <p className="text-2xl sm:text-3xl font-sans font-light text-brand-primary tracking-tight">${order.total_price.toFixed(2)}</p>
           </div>
         </div>
       </div>
@@ -599,38 +707,38 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onEdit, onDelete }) 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   return (
-    <div className="bg-white rounded-3xl p-6 border border-brand-primary/5 flex gap-4 group relative">
+    <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-brand-primary/5 flex gap-3 sm:gap-4 group relative">
       {isConfirmingDelete && (
-        <div className="absolute inset-0 bg-white/90 backdrop-blur-sm rounded-3xl z-10 flex flex-col items-center justify-center p-6 text-center">
-          <p className="text-[10px] uppercase tracking-widest font-black text-brand-primary mb-4">Delete this item?</p>
-          <div className="flex gap-4">
-            <button onClick={onDelete} className="bg-red-500 text-white px-6 py-2 rounded-xl text-[10px] uppercase tracking-widest font-black shadow-lg shadow-red-200">Confirm</button>
-            <button onClick={() => setIsConfirmingDelete(false)} className="bg-brand-beige text-brand-primary px-6 py-2 rounded-xl text-[10px] uppercase tracking-widest font-black">Cancel</button>
+        <div className="absolute inset-0 bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl z-10 flex flex-col items-center justify-center p-4 text-center">
+          <p className="text-[10px] uppercase tracking-widest font-black text-brand-primary mb-3">Delete this item?</p>
+          <div className="flex gap-3">
+            <button onClick={onDelete} className="bg-red-500 text-white px-5 py-1.5 rounded-xl text-[10px] uppercase tracking-widest font-black shadow-lg shadow-red-200">Confirm</button>
+            <button onClick={() => setIsConfirmingDelete(false)} className="bg-brand-beige text-brand-primary px-5 py-1.5 rounded-xl text-[10px] uppercase tracking-widest font-black">Cancel</button>
           </div>
         </div>
       )}
-      <div className="w-20 h-24 bg-brand-paper rounded-xl overflow-hidden flex-shrink-0">
+      <div className="w-16 h-20 sm:w-20 sm:h-24 bg-brand-paper rounded-xl overflow-hidden flex-shrink-0">
         <img src={product.image} alt={product.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
       </div>
       <div className="flex-grow flex flex-col justify-between">
         <div>
-          <h3 className="font-serif text-brand-primary italic leading-tight mb-1">{product.name}</h3>
+          <h3 className="font-serif text-brand-primary italic leading-tight mb-1 text-sm sm:text-base">{product.name}</h3>
           <p className="text-[8px] uppercase tracking-widest font-black text-brand-gold">{product.category}</p>
         </div>
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-mono text-brand-primary/60">{product.price}</span>
-          <div className="flex gap-2">
+        <div className="flex justify-between items-center mt-2">
+          <span className="text-xs sm:text-sm font-mono text-brand-primary/60">{product.price}</span>
+          <div className="flex gap-1.5">
             <button 
               onClick={onEdit}
-              className="p-2 hover:bg-brand-paper rounded-lg text-brand-primary transition-colors"
+              className="p-1.5 hover:bg-brand-paper rounded-lg text-brand-primary transition-colors"
             >
-              <Edit3 size={16} />
+              <Edit3 size={15} />
             </button>
             <button 
               onClick={() => setIsConfirmingDelete(true)}
-              className="p-2 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+              className="p-1.5 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
             >
-              <Trash2 size={16} />
+              <Trash2 size={15} />
             </button>
           </div>
         </div>
@@ -653,15 +761,15 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onUpdate, onDelet
 
   if (isEditing) {
     return (
-      <div className="bg-brand-paper p-6 rounded-3xl border border-brand-accent/20 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <div className="bg-brand-paper p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-brand-accent/20 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
             <label className="text-[8px] uppercase tracking-widest font-black text-brand-primary/40 px-1">Name</label>
             <input 
               type="text" 
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="w-full bg-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none ring-1 ring-brand-accent/10"
+              className="w-full bg-white px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none ring-1 ring-brand-accent/10"
             />
           </div>
           <ImageUpload 
@@ -673,13 +781,13 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onUpdate, onDelet
         <div className="flex gap-2 justify-end">
           <button 
             onClick={() => { setEditName(category.name); setEditImage(category.image || ''); setIsEditing(false); }}
-            className="px-4 py-2 text-[10px] uppercase font-black text-brand-primary/40"
+            className="px-3 py-1.5 text-[10px] uppercase font-black text-brand-primary/40"
           >
             Cancel
           </button>
           <button 
             onClick={() => { if(editName.trim()) { onUpdate(editName.trim(), editImage); setIsEditing(false); } }}
-            className="bg-brand-primary text-white px-6 py-2 rounded-xl text-[10px] uppercase font-black"
+            className="bg-brand-primary text-white px-5 py-1.5 rounded-xl text-[10px] uppercase font-black"
           >
             Save
           </button>
@@ -689,13 +797,13 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onUpdate, onDelet
   }
 
   return (
-    <div className="bg-white rounded-3xl p-6 border border-brand-primary/5 group relative overflow-hidden">
-      <div className="flex gap-4 items-center">
-        <div className="w-16 h-16 rounded-2xl bg-brand-paper overflow-hidden flex-shrink-0 flex items-center justify-center">
+    <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-brand-primary/5 group relative overflow-hidden">
+      <div className="flex gap-3 sm:gap-4 items-center">
+        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-brand-paper overflow-hidden flex-shrink-0 flex items-center justify-center">
           {category.image ? (
             <img src={category.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
-            <LayoutGrid size={24} className="text-brand-primary/10" />
+            <LayoutGrid size={20} className="text-brand-primary/10 sm:w-6 sm:h-6" />
           )}
         </div>
         <div className="flex-grow">
@@ -740,15 +848,15 @@ function ProductFormModal({ editingProduct, categories, onClose, onSave }: {
   });
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-      <div className="absolute inset-0 bg-brand-primary/40 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="fixed inset-0 bg-brand-primary/40 backdrop-blur-sm" onClick={onClose} />
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-4xl bg-brand-paper rounded-[40px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-4xl bg-brand-paper rounded-[24px] sm:rounded-[40px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col my-auto"
       >
-        <div className="p-8 border-b border-brand-primary/5 flex justify-between items-center">
-          <h2 className="text-2xl font-serif text-brand-primary italic">
+        <div className="p-5 sm:p-8 border-b border-brand-primary/5 flex justify-between items-center shrink-0">
+          <h2 className="text-xl sm:text-2xl font-serif text-brand-primary italic">
             {editingProduct ? 'Edit Botanical' : 'New Creation'}
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-brand-primary/5 rounded-full transition-colors">
@@ -756,9 +864,9 @@ function ProductFormModal({ editingProduct, categories, onClose, onSave }: {
           </button>
         </div>
 
-        <div className="flex-grow overflow-y-auto p-10 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-6">
+        <div className="flex-grow overflow-y-auto p-5 sm:p-10 space-y-6 sm:space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+            <div className="space-y-4 sm:space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40 px-1">Product Name</label>
                 <input 
@@ -768,7 +876,7 @@ function ProductFormModal({ editingProduct, categories, onClose, onSave }: {
                   className="w-full bg-white border border-brand-primary/5 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-brand-accent/20"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40 px-1">Category</label>
                   <select 
@@ -808,7 +916,7 @@ function ProductFormModal({ editingProduct, categories, onClose, onSave }: {
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40 px-1">Description</label>
                 <textarea 
@@ -830,9 +938,9 @@ function ProductFormModal({ editingProduct, categories, onClose, onSave }: {
             </div>
           </div>
 
-          <div className="space-y-4 pt-10 border-t border-brand-primary/5">
+          <div className="space-y-4 pt-6 sm:pt-10 border-t border-brand-primary/5">
             <h3 className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40">Gallery Carousel (Main Image Uploads)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[0, 1, 2].map(i => (
                 <div key={`main-${i}`}>
                   <ImageUpload 
@@ -848,9 +956,9 @@ function ProductFormModal({ editingProduct, categories, onClose, onSave }: {
             </div>
           </div>
 
-          <div className="space-y-4 pt-6">
+          <div className="space-y-4 pt-4 sm:pt-6">
             <h3 className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40">Localized Arabic Images</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[0, 1].map(i => (
                 <div key={`ar-${i}`}>
                   <ImageUpload 
@@ -866,9 +974,9 @@ function ProductFormModal({ editingProduct, categories, onClose, onSave }: {
             </div>
           </div>
 
-          <div className="space-y-4 pt-6">
+          <div className="space-y-4 pt-4 sm:pt-6">
             <h3 className="text-[10px] uppercase tracking-widest font-black text-brand-primary/40">Localized Kurdish Images</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[0, 1].map(i => (
                 <div key={`kr-${i}`}>
                   <ImageUpload 
@@ -885,11 +993,11 @@ function ProductFormModal({ editingProduct, categories, onClose, onSave }: {
           </div>
         </div>
 
-        <div className="p-8 bg-brand-paper border-t border-brand-primary/5 flex justify-end gap-4">
-          <button onClick={onClose} className="px-8 py-4 text-[10px] uppercase tracking-widest font-black text-brand-primary/40 hover:text-brand-primary transition-colors">Cancel</button>
+        <div className="p-4 sm:p-8 bg-brand-paper border-t border-brand-primary/5 flex justify-end gap-3 sm:gap-4 shrink-0">
+          <button onClick={onClose} className="px-5 sm:px-8 py-3.5 sm:py-4 text-[10px] uppercase tracking-widest font-black text-brand-primary/40 hover:text-brand-primary transition-colors">Cancel</button>
           <button 
             onClick={() => onSave(formData)}
-            className="bg-brand-primary text-white px-12 py-4 rounded-xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors"
+            className="bg-brand-primary text-white px-8 sm:px-12 py-3.5 sm:py-4 rounded-xl text-[10px] uppercase tracking-widest font-black hover:bg-brand-accent transition-colors"
           >
             {editingProduct ? 'Save Changes' : 'Found Creation'}
           </button>

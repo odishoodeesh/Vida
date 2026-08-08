@@ -136,10 +136,90 @@ Rules for your tone & recommendations:
 - If the language is Kurdish, translate your feedback into elegant Kurdish (Sorani/Kurmanji as appropriate, or default to a warm elegant Kurmanji/Kurdish).
 - Otherwise, speak English.`;
 
+// Fallback responses when GEMINI_API_KEY is not configured or on network issues
+function getFallbackChatResponse(message: string = '', language: string = 'en') {
+  const msgLower = (message || '').toLowerCase();
+  let recommendedProductIds: string[] = [];
+  let reply = "";
+
+  if (msgLower.includes("hair") || msgLower.includes("scalp") || msgLower.includes("frizz") || msgLower.includes("growth") || msgLower.includes("rosemary")) {
+    recommendedProductIds = ["2", "1", "8"];
+    if (language === 'ar') {
+      reply = "لتحسين صحة الشعر وفروة الرأس، نوصي بتركيبة الزيوت النباتية المعصورة على البارد: زيت الروزماري (رقم 2) لتحفيز نمو البصيلات، وزيت الخروع (رقم 1) لتقوية الجذور، وزيت الأرجان (رقم 8) للنعومة واللمعان.";
+    } else if (language === 'kr') {
+      reply = "بۆ باشترکرنا تەندروستیا پرچ و کەپۆلا سەرێ، ئەرکانێ مە چێکرنا زەیتێن سروشتی پێشنيار دکەت: زەیتا روزماری (ژمارە 2) بۆ زێدەکرنا پرچێ، زەیتا خروع (ژمارە 1) بۆ بوهێزکرنا ڕەگان، و زەیتا ئەرگان (ژمارە 8) بۆ نەرماتیێ.";
+    } else {
+      reply = "For hair vitality and scalp stimulation, our Alchemist recommends a cold-pressed botanical ritual featuring Rosemary Oil (No. 2) for root stimulation, Castor Oil (No. 1) for density, and Argan Oil (No. 8) for silkiness and frizz control.";
+    }
+  } else if (msgLower.includes("dry") || msgLower.includes("moisture") || msgLower.includes("hydration") || msgLower.includes("dehydrated")) {
+    recommendedProductIds = ["3", "5", "6"];
+    if (language === 'ar') {
+      reply = "للبشرة الجافة والباهتة، خلطتنا النباتية الموصى بها تجمع بين زيت اللوز العضوي (رقم 3) للترطيب العميق، وزيت الجوجوبا (رقم 5) لإعادة التوازن الطبيعي، وزيت الزيتون (رقم 6) للترميم الغني.";
+    } else if (language === 'kr') {
+      reply = "بۆ پیستێ هشک، تێکەڵا مە یا پێشنيارکری زەیتا بادەما (ژمارە 3) بۆ تەقاندنا ئاڤێ، زەیتا جوجۆبا (ژمارە 5) بۆ هاوسەنگیا چەوریێ، و زەیتا زەیتونێ (ژمارە 6) بۆ نەرمکرنا کوور دگریتە خۆ.";
+    } else {
+      reply = "For dry or dehydrated skin, the Alchemist suggests our deeply nourishing blend of Organic Almond Oil (No. 3), Jojoba Oil (No. 5) for lipid balance, and Olive Oil (No. 6) for cellular moisture renewal.";
+    }
+  } else if (msgLower.includes("acne") || msgLower.includes("oily") || msgLower.includes("blemish") || msgLower.includes("purify")) {
+    recommendedProductIds = ["5", "2", "14"];
+    if (language === 'ar') {
+      reply = "للبشرة الدهنية أو المعرضة للشوائب، نوصي بزيت الجوجوبا (رقم 5) لضبط الإفرازات الزهمية، وزيت الروزماري (رقم 2) لتنقية المسام، وزيت الحبة السوداء (رقم 14) لتهدئة التهيج.";
+    } else if (language === 'kr') {
+      reply = "بۆ پیستێ چەور یان زیپکەدار، زەیتا جوجۆبا (ژمارە 5) بۆ هاوسەنگیا چەوریێ و زەیتا دەنکە ڕەش (ژمارە 14) بۆ هێورکرنا سۆتنگەهێ گەلەک بەرهەمدارن.";
+    } else {
+      reply = "For oily or blemish-prone complexions, our formula balances sebum production with lightweight Jojoba Oil (No. 5), purifying Rosemary Oil (No. 2), and soothing Blackseed Oil (No. 14).";
+    }
+  } else {
+    recommendedProductIds = ["5", "11", "4"];
+    if (language === 'ar') {
+      reply = "مرحباً بك في استوديو فيدا النباتي. نوصي بزيوتنا الذهبية المغذية: زيت الجوجوبا (رقم 5) لإعطاء المرونة والنعومة، وزيت بذور الشيا (رقم 11) الغني بمضادات الأكسدة لترميم البشرة وحمايتها اليومية.";
+    } else if (language === 'kr') {
+      reply = "بخێر بێی بۆ الاستوديو یا ڤیدا. نیشاندانا مە یا ڕووەکی زەیتا جوجۆبا (ژمارە 5) و زەیتا دەنکێن شیا (ژمارە 11) پێشنيار دکەت بۆ نووکرنا تیشکا سروشتی.";
+    } else {
+      reply = "Welcome to VIDA Botanical Studio. For daily radiance and barrier fortification, our Alchemist suggests balancing your complexion with cold-pressed Jojoba Oil (No. 5) and antioxidant-rich Chia Seed Oil (No. 11).";
+    }
+  }
+
+  return { reply, recommendedProductIds };
+}
+
+function getFallbackDiagnoseResponse(answers: any = {}, language: string = 'en') {
+  const skinType = answers.skinType || 'dry';
+  const concern = answers.primaryConcern || 'hydration';
+  let recommendedProductIds: string[] = ["5", "3"];
+
+  if (skinType === 'dry' || concern === 'hydration') {
+    recommendedProductIds = ["3", "5", "6"];
+  } else if (concern === 'acne' || skinType === 'oily') {
+    recommendedProductIds = ["5", "2", "14"];
+  } else if (concern === 'aging' || skinType === 'mature') {
+    recommendedProductIds = ["11", "12", "8"];
+  } else if (answers.hairGoals && answers.hairGoals !== 'none') {
+    recommendedProductIds = ["2", "1", "8"];
+  }
+
+  let reply = "";
+  if (language === 'ar') {
+    reply = `تم إعداد طقوسك النباتية المخصصة بناءً على تشخيص بشرتك (${skinType}) واحتياجاتك الخاصة (${concern}). نوصي باستخدام هذه التركيبة المعصورة على البارد يومياً لترميم وإحياء بشرتك.`;
+  } else if (language === 'kr') {
+    reply = `ڕیتوالا تە یا تایبەت هاتبە ئامادەکرن بۆ پیستێ تە (${skinType}). ئەڤ تێکەڵە دەستنیشانکریە دا کو ڕەوشا پیستێ تە نوی بکەتەڤە.`;
+  } else {
+    reply = `Your bespoke botanical ritual has been crafted for your ${skinType} profile focusing on ${concern}. Apply 3-4 drops of these cold-pressed formulations morning and evening to restore elasticity and natural glow.`;
+  }
+
+  return { reply, recommendedProductIds };
+}
+
 // API routes FIRST
 app.post("/api/alchemist/chat", async (req, res) => {
   try {
     const { message, history, language } = req.body;
+
+    if (!process.env.GEMINI_API_KEY) {
+      console.warn("GEMINI_API_KEY environment variable is not configured; using botanical fallback response.");
+      return res.json(getFallbackChatResponse(message, language));
+    }
+
     const ai = getAIClient();
 
     const contents = [
@@ -154,7 +234,7 @@ app.post("/api/alchemist/chat", async (req, res) => {
     ];
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.6-flash",
       contents: contents as any,
       config: {
         systemInstruction: SYSTEM_INSTRUCTIONS,
@@ -184,17 +264,19 @@ app.post("/api/alchemist/chat", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Alchemist API Error:", error);
-    res.status(500).json({
-      reply: "The Alchemist is currently preparing botanical tinctures. Please try again in a moment.",
-      recommendedProductIds: [],
-      error: error.message
-    });
+    res.json(getFallbackChatResponse(req.body.message, req.body.language));
   }
 });
 
 app.post("/api/alchemist/diagnose", async (req, res) => {
   try {
     const { answers, language } = req.body;
+
+    if (!process.env.GEMINI_API_KEY) {
+      console.warn("GEMINI_API_KEY environment variable is not configured; using botanical fallback response.");
+      return res.json(getFallbackDiagnoseResponse(answers, language));
+    }
+
     const diagnosisPrompt = `Provide a full botanical ritual.
 Profile:
 - Skin Type: ${answers.skinType}
@@ -211,7 +293,7 @@ Profile:
     ];
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.6-flash",
       contents: contents as any,
       config: {
         systemInstruction: SYSTEM_INSTRUCTIONS,
@@ -241,11 +323,7 @@ Profile:
     });
   } catch (error: any) {
     console.error("Diagnosis API Error:", error);
-    res.status(500).json({
-      reply: "The Alchemist is currently preparing botanical tinctures. Please try again in a moment.",
-      recommendedProductIds: [],
-      error: error.message
-    });
+    res.json(getFallbackDiagnoseResponse(req.body.answers, req.body.language));
   }
 });
 

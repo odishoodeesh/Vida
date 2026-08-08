@@ -117,7 +117,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 bottom-0 z-[120] w-full max-w-md bg-brand-paper shadow-2xl flex flex-col"
+            className="fixed top-0 right-0 bottom-0 z-[120] w-[85%] sm:w-[75%] md:w-[75vw] bg-brand-paper shadow-2xl flex flex-col"
           >
             {/* Header */}
             <div className="p-8 flex items-center justify-between border-b border-brand-primary/5">
@@ -200,7 +200,7 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                       <input 
                         required
                         type="tel"
-                        placeholder="+964 750 --- ----"
+                        placeholder="0750 200 4774"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
                         className="w-full bg-transparent border-b border-brand-primary/20 py-4 px-1 text-xl font-mono text-brand-primary outline-none focus:border-brand-accent transition-colors"

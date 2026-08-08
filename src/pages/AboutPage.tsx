@@ -92,7 +92,7 @@ export default function AboutPage() {
                   <span className="text-[10px] uppercase tracking-[0.3em] font-black">{t('call_us')}</span>
                 </div>
                 <div className="text-brand-primary font-medium">
-                  <a href="tel:+9647500000000" className="hover:text-brand-accent transition-colors">+964 750 000 0000</a>
+                  <a href="tel:07502004774" className="hover:text-brand-accent transition-colors font-mono">0750 200 4774</a>
                 </div>
               </div>
 

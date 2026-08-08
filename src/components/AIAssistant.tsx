@@ -194,9 +194,48 @@ export default function AIAssistant() {
       const response = await askAlchemist(userMsg, formattedHistory, language);
       
       // Map suggested product IDs to actual objects
-      const matchedProducts = response.recommendedProductIds
+      let matchedProducts = (response.recommendedProductIds || [])
         .map(id => products.find(p => p.id === id))
         .filter((p): p is Product => !!p);
+
+      // Extract matching products if user or response mentions products or concerns
+      const queryLower = userMsg.toLowerCase();
+      const replyLower = (response.reply || '').toLowerCase();
+      const fullText = queryLower + ' ' + replyLower;
+
+      const isProductQuery = 
+        queryLower.includes('product') || queryLower.includes('item') || queryLower.includes('oil') ||
+        queryLower.includes('buy') || queryLower.includes('sell') || queryLower.includes('price') ||
+        queryLower.includes('cost') || queryLower.includes('recommend') || queryLower.includes('suggest') ||
+        queryLower.includes('hair') || queryLower.includes('skin') || queryLower.includes('face') ||
+        queryLower.includes('dry') || queryLower.includes('acne') || queryLower.includes('scalp') ||
+        queryLower.includes('growth') || queryLower.includes('frizz') || queryLower.includes('routine') ||
+        queryLower.includes('show') || queryLower.includes('what') || queryLower.includes('have') ||
+        products.some(p => queryLower.includes(p.name.toLowerCase()));
+
+      if (matchedProducts.length === 0 || isProductQuery) {
+        const extraMatches = products.filter(p => {
+          if (matchedProducts.some(mp => mp.id === p.id)) return false;
+          const pName = p.name.toLowerCase();
+          
+          if (fullText.includes(pName) || pName.split(' ').some(w => w.length > 3 && fullText.includes(w))) {
+            return true;
+          }
+          if ((fullText.includes('hair') || fullText.includes('growth') || fullText.includes('scalp')) && ['1', '2', '8', '15'].includes(p.id)) return true;
+          if ((fullText.includes('dry') || fullText.includes('moisture') || fullText.includes('hydrate')) && ['3', '5', '6'].includes(p.id)) return true;
+          if ((fullText.includes('acne') || fullText.includes('oily') || fullText.includes('blemish')) && ['5', '2', '14'].includes(p.id)) return true;
+          if ((fullText.includes('glow') || fullText.includes('radiance') || fullText.includes('dull')) && ['11', '3', '17'].includes(p.id)) return true;
+          return false;
+        });
+
+        matchedProducts = [...matchedProducts, ...extraMatches];
+      }
+
+      if (matchedProducts.length === 0 && isProductQuery) {
+        matchedProducts = products.slice(0, 3);
+      }
+
+      matchedProducts = matchedProducts.slice(0, 4);
 
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -233,9 +272,42 @@ export default function AIAssistant() {
         hairGoals: quizAnswers.hairGoals || undefined
       };
       const result = await diagnoseRoutine(answers, language);
-      setQuizResult(result);
+
+      // Ensure we have matched products based on diagnosis answers
+      let matchedIds = (result.recommendedProductIds || []).filter(id => products.some(p => p.id === id));
+      
+      if (matchedIds.length === 0) {
+        if (answers.skinType === 'dry' || answers.primaryConcern === 'hydration') {
+          matchedIds = ["3", "5", "6"];
+        } else if (answers.primaryConcern === 'acne' || answers.skinType === 'oily') {
+          matchedIds = ["5", "2", "14"];
+        } else if (answers.primaryConcern === 'aging' || answers.skinType === 'mature') {
+          matchedIds = ["11", "12", "8"];
+        } else if (answers.hairGoals && answers.hairGoals !== 'none') {
+          matchedIds = ["2", "1", "8"];
+        } else {
+          matchedIds = ["5", "3", "2"];
+        }
+      }
+
+      setQuizResult({
+        ...result,
+        recommendedProductIds: matchedIds
+      });
     } catch (err) {
       console.error(err);
+      let fallbackIds = ["3", "5", "2"];
+      if (quizAnswers.concern === 'acne' || quizAnswers.skinType === 'oily') fallbackIds = ["5", "2", "14"];
+      if (quizAnswers.hairGoals === 'growth') fallbackIds = ["2", "1", "8"];
+
+      setQuizResult({
+        reply: language === 'ar' 
+          ? "تم تحضير طقوسك النباتية الخاصة بناءً على تشخيصك المباشر. استخدم 3-4 قطرات صباحاً ومساءً لترميم بشرتك وحمايتها."
+          : language === 'kr'
+          ? "ڕیتوالا تە یا ڕووەکی هاتبە ئامادەکرن. 3-4 دلۆپ بکاربینە سپێدێ و ئێڤارێ."
+          : "Your bespoke botanical ritual has been crafted based on your skin diagnostic profile. Apply 3-4 drops morning and evening for natural radiance.",
+        recommendedProductIds: fallbackIds
+      });
     } finally {
       setIsLoading(false);
     }
@@ -255,27 +327,24 @@ export default function AIAssistant() {
   return (
     <>
       {/* Floating Button with pulse */}
-      <div className="fixed bottom-8 right-8 z-[200]">
-        <motion.button
-          id="ai-droplet-button"
-          onClick={() => setIsOpen(!isOpen)}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          className={`relative p-5 rounded-full shadow-2xl transition-all cursor-pointer ${
-            isOpen 
-              ? 'bg-brand-primary text-white ring-4 ring-brand-light/35' 
-              : 'bg-brand-primary text-brand-gold hover:text-white ring-4 ring-brand-gold/15 hover:ring-brand-accent/40'
-          }`}
-        >
-          {isOpen ? <X size={24} /> : <Sparkles className="animate-pulse" size={24} />}
-          {!isOpen && (
+      {!isOpen && (
+        <div className="fixed bottom-8 right-8 z-[200]">
+          <motion.button
+            id="ai-droplet-button"
+            onClick={() => setIsOpen(true)}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            className="relative p-5 rounded-full shadow-2xl transition-all cursor-pointer bg-brand-primary text-brand-gold hover:text-white ring-4 ring-brand-gold/15 hover:ring-brand-accent/40"
+            aria-label="Open VIDA AI Chatbot"
+          >
+            <Sparkles className="animate-pulse" size={24} />
             <span className="absolute -top-1 -right-1 flex h-4 w-4">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-accent opacity-75"></span>
               <span className="relative inline-flex rounded-full h-4 w-4 bg-brand-accent"></span>
             </span>
-          )}
-        </motion.button>
-      </div>
+          </motion.button>
+        </div>
+      )}
 
       {/* Slide-out Panel */}
       <AnimatePresence>
@@ -301,8 +370,8 @@ export default function AIAssistant() {
               {/* Header */}
               <div className="p-6 md:p-8 border-b border-brand-primary/5 flex items-center justify-between bg-brand-beige">
                 <div className="flex items-center gap-4">
-                  <div className="bg-brand-primary/10 p-3 rounded-2xl text-brand-primary">
-                    <Sparkles size={20} className="text-brand-primary" />
+                  <div className="bg-brand-primary text-brand-gold p-3 rounded-2xl shadow-sm flex items-center justify-center">
+                    <Sparkles size={22} className="text-brand-gold animate-pulse" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-serif font-semibold italic text-brand-primary leading-tight">
@@ -316,7 +385,8 @@ export default function AIAssistant() {
                 
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-2 hover:bg-brand-primary/5 rounded-full transition-colors cursor-pointer text-brand-primary/40 hover:text-brand-primary"
+                  className="p-2.5 hover:bg-brand-primary/10 rounded-full transition-colors cursor-pointer text-brand-primary/60 hover:text-brand-primary"
+                  aria-label="Close chatbot"
                 >
                   <X size={20} />
                 </button>
@@ -363,8 +433,8 @@ export default function AIAssistant() {
                         className={`flex gap-4 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         {m.role === 'model' && (
-                          <div className="w-8 h-8 rounded-full bg-brand-primary/5 border border-brand-primary/10 flex items-center justify-center flex-shrink-0 text-brand-primary">
-                            <Bot size={14} />
+                          <div className="w-8 h-8 rounded-full bg-brand-primary text-brand-gold flex items-center justify-center flex-shrink-0 shadow-sm">
+                            <Sparkles size={14} />
                           </div>
                         )}
                         
@@ -399,8 +469,8 @@ export default function AIAssistant() {
                     {/* Chat Loading Skeleton */}
                     {isLoading && (
                       <div className="flex gap-4 justify-start">
-                        <div className="w-8 h-8 rounded-full bg-brand-primary/5 border border-brand-primary/10 flex items-center justify-center flex-shrink-0 text-brand-primary">
-                          <Bot size={14} className="animate-spin" />
+                        <div className="w-8 h-8 rounded-full bg-brand-primary text-brand-gold flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <Sparkles size={14} className="animate-spin" />
                         </div>
                         <div className="bg-brand-beige rounded-3xl rounded-bl-none p-5 border border-brand-primary/5 max-w-[80%]">
                           <div className="flex gap-1.5 items-center">
@@ -668,21 +738,33 @@ export default function AIAssistant() {
                             </div>
 
                             {/* Render Recommended products */}
-                            {quizResult.recommendedProductIds && quizResult.recommendedProductIds.length > 0 && (
-                              <div className="space-y-4">
-                                <p className="text-[10px] uppercase tracking-widest font-black text-brand-gold">
-                                  {tAi.suggested_ritual}
-                                </p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                  {quizResult.recommendedProductIds
-                                    .map(id => products.find(p => p.id === id))
-                                    .filter((p): p is Product => !!p)
-                                    .map((p) => (
+                            {(() => {
+                              const recommendedProds = (quizResult.recommendedProductIds || [])
+                                .map(id => products.find(p => p.id === id))
+                                .filter((p): p is Product => !!p);
+
+                              const displayProds = recommendedProds.length > 0 
+                                ? recommendedProds 
+                                : products.slice(0, 3);
+
+                              return (
+                                <div className="space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-[10px] uppercase tracking-widest font-black text-brand-gold">
+                                      {tAi.suggested_ritual}
+                                    </p>
+                                    <span className="text-[9px] uppercase tracking-widest text-brand-primary/50 font-semibold">
+                                      {displayProds.length} {displayProds.length === 1 ? 'Product' : 'Products'} Formulated
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {displayProds.map((p) => (
                                       <ProductCard key={p.id} p={p} tAi={tAi} addToCart={addToCart} isInCart={isProductInCart(p.id)} />
                                     ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
 
                             <div className="flex justify-center pt-4">
                               <button

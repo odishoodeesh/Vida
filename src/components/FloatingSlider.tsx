@@ -27,7 +27,7 @@ export default function FloatingSlider() {
   return (
     <div className="bg-brand-paper">
       {/* Layout Controls */}
-      <div className="container mx-auto px-6 py-12 flex justify-center sticky top-20 z-[40]">
+      <div className="container mx-auto px-6 py-8 flex justify-center z-10">
         <div className="flex bg-white/80 backdrop-blur-md p-1.5 rounded-full border border-brand-primary/5 shadow-2xl shadow-brand-primary/10 transition-all hover:scale-105">
           <button 
             onClick={() => setLayout('immersive')}

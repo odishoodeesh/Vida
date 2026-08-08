@@ -4,16 +4,16 @@ export function safeSetLocalStorage(key: string, value: any): void {
     localStorage.setItem(key, stringified);
   } catch (e: any) {
     if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
-      console.warn(`[Storage] Quota exceeded for key "${key}". Cleaning up and optimizing cached data.`);
+      console.warn(`[Storage] Quota exceeded for key "${key}". Cleaning up cached data.`);
       
-      // Attempt 1: Sanitize arrays (products, categories, orders) by removing massive base64 image strings
+      // Attempt 1: Sanitize arrays (products, categories, orders) by removing base64 data URLs without injecting fake placeholder URLs
       if (Array.isArray(value)) {
         try {
           const sanitized = value.map((item: any) => {
             if (item && typeof item === 'object') {
               const copy = { ...item };
-              if (typeof copy.image === 'string' && copy.image.startsWith('data:image/') && copy.image.length > 20000) {
-                copy.image = 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=800';
+              if (typeof copy.image === 'string' && copy.image.startsWith('data:image/')) {
+                copy.image = '';
               }
               if (Array.isArray(copy.images)) {
                 copy.images = copy.images.filter((img: string) => typeof img === 'string' && !img.startsWith('data:image/'));
@@ -35,7 +35,7 @@ export function safeSetLocalStorage(key: string, value: any): void {
 
       // Attempt 2: Clear old temporary or non-critical cache keys
       try {
-        const nonCriticalKeys = ['vida_featured', 'vida_hero_image'];
+        const nonCriticalKeys = ['vida_featured', 'vida_hero_image', 'vida_orders'];
         for (const k of nonCriticalKeys) {
           if (k !== key) {
             localStorage.removeItem(k);
@@ -44,7 +44,7 @@ export function safeSetLocalStorage(key: string, value: any): void {
         localStorage.setItem(key, stringified);
         return;
       } catch {
-        // Suppress quota exception to prevent app crash
+        // Suppress quota exception
       }
     } else {
       console.warn(`[Storage] Could not set "${key}":`, e);

@@ -1,17 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Logo from './Logo';
+import { useStore } from '../lib/StoreContext';
 
 export default function IntroSplash() {
+  const { isLoaded } = useStore();
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-    }, 1000);
+    let hideTimer: NodeJS.Timeout;
+    if (isLoaded) {
+      // Once database data is loaded, smoothly hide splash after brief transition
+      hideTimer = setTimeout(() => {
+        setIsVisible(false);
+      }, 400);
+    }
 
-    return () => clearTimeout(timer);
-  }, []);
+    // Safety fallback so splash never stays indefinitely if network drops
+    const maxTimer = setTimeout(() => {
+      setIsVisible(false);
+    }, 3500);
+
+    return () => {
+      if (hideTimer) clearTimeout(hideTimer);
+      clearTimeout(maxTimer);
+    };
+  }, [isLoaded]);
 
   return (
     <AnimatePresence>

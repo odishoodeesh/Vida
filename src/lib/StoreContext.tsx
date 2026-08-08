@@ -35,6 +35,7 @@ export interface FeaturedItem {
 }
 
 interface StoreContextType {
+  isLoaded: boolean;
   products: Product[];
   categories: Category[];
   featuredItems: FeaturedItem[];
@@ -428,6 +429,8 @@ const INITIAL_PRODUCTS: Product[] = [
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const [isLoaded, setIsLoaded] = useState<boolean>(false);
+
   const [language, setLanguage] = useState<Language>(() => {
     return safeGetLocalStorage<Language>('vida_lang', 'en');
   });
@@ -449,59 +452,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   });
 
   // Real-time synchronization with Supabase
-  useEffect(() => {
-    if (!supabase) return;
+  const loadData = async () => {
+    if (!supabase) {
+      setIsLoaded(true);
+      return;
+    }
 
-    const loadData = async () => {
-      try {
-        // 1. Load Categories
-        const { data: catData, error: catErr } = await supabase.from('categories').select('*');
-        if (!catErr && catData) {
-          if (catData.length === 0) {
-            // Seed initial categories
-            const { data: seededCats } = await supabase.from('categories').insert(
-              INITIAL_CATEGORIES.map(({ id, ...rest }) => rest)
-            ).select();
-            if (seededCats) {
-              setCategories(seededCats.map((c: any) => ({ ...c, id: c.id.toString() })));
-            }
-          } else {
-            setCategories(catData.map((c: any) => ({ ...c, id: c.id.toString() })));
+    try {
+      // 1. Load Categories
+      const { data: catData, error: catErr } = await supabase.from('categories').select('*');
+      if (!catErr && catData) {
+        if (catData.length === 0) {
+          // Seed initial categories
+          const { data: seededCats } = await supabase.from('categories').insert(
+            INITIAL_CATEGORIES.map(({ id, ...rest }) => rest)
+          ).select();
+          if (seededCats) {
+            const mapped = seededCats.map((c: any) => ({ ...c, id: c.id.toString() }));
+            setCategories(mapped);
+            safeSetLocalStorage('vida_categories', mapped);
           }
+        } else {
+          const mapped = catData.map((c: any) => ({ ...c, id: c.id.toString() }));
+          setCategories(mapped);
+          safeSetLocalStorage('vida_categories', mapped);
         }
+      }
 
-        // 2. Load Products
-        const { data: prodData, error: prodErr } = await supabase.from('products').select('*');
-        if (!prodErr && prodData) {
-          if (prodData.length === 0) {
-            // Seed initial products
-            const { data: seededProds } = await supabase.from('products').insert(
-              INITIAL_PRODUCTS.map(({ id, ...rest }) => ({
-                name: rest.name,
-                category: rest.category,
-                price: rest.price,
-                image: rest.image,
-                images: rest.images,
-                localized_images: rest.localizedImages,
-                description: rest.description,
-                benefits: rest.benefits
-              }))
-            ).select();
-            if (seededProds) {
-              setProducts(seededProds.map((p: any) => ({
-                id: p.id.toString(),
-                name: p.name,
-                category: p.category,
-                price: p.price,
-                image: p.image,
-                images: p.images || [],
-                localizedImages: p.localized_images,
-                description: p.description,
-                benefits: p.benefits || []
-              })));
-            }
-          } else {
-            setProducts(prodData.map((p: any) => ({
+      // 2. Load Products
+      const { data: prodData, error: prodErr } = await supabase.from('products').select('*');
+      if (!prodErr && prodData) {
+        if (prodData.length === 0) {
+          // Seed initial products
+          const { data: seededProds } = await supabase.from('products').insert(
+            INITIAL_PRODUCTS.map(({ id, ...rest }) => ({
+              name: rest.name,
+              category: rest.category,
+              price: rest.price,
+              image: rest.image,
+              images: rest.images,
+              localized_images: rest.localizedImages,
+              description: rest.description,
+              benefits: rest.benefits
+            }))
+          ).select();
+          if (seededProds) {
+            const mapped = seededProds.map((p: any) => ({
               id: p.id.toString(),
               name: p.name,
               category: p.category,
@@ -511,37 +507,75 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               localizedImages: p.localized_images,
               description: p.description,
               benefits: p.benefits || []
-            })));
+            }));
+            setProducts(mapped);
+            safeSetLocalStorage('vida_products', mapped);
           }
+        } else {
+          const mapped = prodData.map((p: any) => ({
+            id: p.id.toString(),
+            name: p.name,
+            category: p.category,
+            price: p.price,
+            image: p.image,
+            images: p.images || [],
+            localizedImages: p.localized_images,
+            description: p.description,
+            benefits: p.benefits || []
+          }));
+          setProducts(mapped);
+          safeSetLocalStorage('vida_products', mapped);
         }
-
-        // 3. Load Featured Items
-        const { data: featData, error: featErr } = await supabase.from('featured_items').select('*');
-        if (!featErr && featData) {
-          if (featData.length === 0) {
-            // Seed initial featured
-            const { data: seededFeat } = await supabase.from('featured_items').insert(
-              INITIAL_FEATURED.map(({ id, ...rest }) => rest)
-            ).select();
-            if (seededFeat) {
-              setFeaturedItems(seededFeat.map((f: any) => ({ ...f, id: f.id.toString() })));
-            }
-          } else {
-            setFeaturedItems(featData.map((f: any) => ({ ...f, id: f.id.toString() })));
-          }
-        }
-
-        // 4. Load Hero Image
-        const { data: configData } = await supabase.from('site_config').select('*').eq('key', 'hero_image').single();
-        if (configData && configData.value) {
-          setHeroImage(configData.value);
-        }
-      } catch (e) {
-        console.error("Error loading data from Supabase:", e);
       }
-    };
 
+      // 3. Load Featured Items
+      const { data: featData, error: featErr } = await supabase.from('featured_items').select('*');
+      if (!featErr && featData) {
+        if (featData.length === 0) {
+          // Seed initial featured
+          const { data: seededFeat } = await supabase.from('featured_items').insert(
+            INITIAL_FEATURED.map(({ id, ...rest }) => rest)
+          ).select();
+          if (seededFeat) {
+            const mapped = seededFeat.map((f: any) => ({ ...f, id: f.id.toString() }));
+            setFeaturedItems(mapped);
+            safeSetLocalStorage('vida_featured', mapped);
+          }
+        } else {
+          const mapped = featData.map((f: any) => ({ ...f, id: f.id.toString() }));
+          setFeaturedItems(mapped);
+          safeSetLocalStorage('vida_featured', mapped);
+        }
+      }
+
+      // 4. Load Hero Image
+      const { data: configData } = await supabase.from('site_config').select('*').eq('key', 'hero_image').single();
+      if (configData && configData.value) {
+        setHeroImage(configData.value);
+        safeSetLocalStorage('vida_hero_image', configData.value);
+      }
+    } catch (e) {
+      console.error("Error loading data from Supabase:", e);
+    } finally {
+      setIsLoaded(true);
+    }
+  };
+
+  useEffect(() => {
     loadData();
+
+    if (supabase) {
+      const channel = supabase
+        .channel('public-db-sync')
+        .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+          loadData();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, []);
 
   useEffect(() => {
@@ -775,6 +809,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return (
     <StoreContext.Provider
       value={{
+        isLoaded,
         products,
         categories,
         featuredItems,

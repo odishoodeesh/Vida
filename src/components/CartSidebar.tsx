@@ -4,6 +4,7 @@ import { X, ShoppingBag, Trash2, Plus, Minus, ArrowRight, Loader2 } from 'lucide
 import { useCart } from '../lib/CartContext';
 import { useTranslation } from '../lib/translations';
 import { supabase } from '../lib/supabase';
+import { safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -79,14 +80,8 @@ export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
       };
 
       // Store in local storage for admin access / dual-write redundancy
-      let existingOrders = [];
-      try {
-        const saved = localStorage.getItem('vida_orders');
-        existingOrders = saved && saved !== 'undefined' ? JSON.parse(saved) : [];
-      } catch (e) {
-        console.error("Failed to parse existing orders:", e);
-      }
-      localStorage.setItem('vida_orders', JSON.stringify([newOrder, ...existingOrders]));
+      const existingOrders = safeGetLocalStorage<any[]>('vida_orders', []);
+      safeSetLocalStorage('vida_orders', [newOrder, ...existingOrders]);
 
       setOrderStep('success');
       clearCart();

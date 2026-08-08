@@ -4,6 +4,7 @@ import { Package, Phone, Calendar, CheckCircle2, Clock, ChevronDown, Plus, Trash
 import { useStore, Product, Category } from '../lib/StoreContext';
 import ImageUpload from '../components/ImageUpload';
 import { supabase } from '../lib/supabase';
+import { safeSetLocalStorage, safeGetLocalStorage } from '../lib/safeStorage';
 
 interface OrderItem {
   id: number;
@@ -69,13 +70,7 @@ export default function AdminPage() {
 
   // State for orders - load from localStorage as initial state, then fetch from Supabase if available
   const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem('vida_orders');
-      return saved && saved !== 'undefined' ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to parse vida_orders from localStorage:", e);
-      return [];
-    }
+    return safeGetLocalStorage<Order[]>('vida_orders', []);
   });
 
   // Fetch real orders from Supabase if available
@@ -107,7 +102,7 @@ export default function AdminPage() {
           // Sort descending by id or date
           const sorted = mappedOrders.sort((a, b) => b.id - a.id);
           setOrders(sorted);
-          localStorage.setItem('vida_orders', JSON.stringify(sorted));
+          safeSetLocalStorage('vida_orders', sorted);
         } else if (error) {
           console.error("Supabase order fetch error:", error);
         }
@@ -135,11 +130,7 @@ export default function AdminPage() {
 
     const updated = orders.map(o => o.id === orderId ? { ...o, status } : o);
     setOrders(updated);
-    try {
-      localStorage.setItem('vida_orders', JSON.stringify(updated));
-    } catch (e) {
-      console.error("Failed to save orders to localStorage:", e);
-    }
+    safeSetLocalStorage('vida_orders', updated);
   };
 
   const deleteOrder = async (orderId: number) => {
@@ -158,11 +149,7 @@ export default function AdminPage() {
 
     const updated = orders.filter(o => o.id !== orderId);
     setOrders(updated);
-    try {
-      localStorage.setItem('vida_orders', JSON.stringify(updated));
-    } catch (e) {
-      console.error("Failed to save orders to localStorage:", e);
-    }
+    safeSetLocalStorage('vida_orders', updated);
   };
 
   if (!isAuthenticated) {

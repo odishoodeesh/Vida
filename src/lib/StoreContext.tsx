@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { supabase } from './supabase';
+import { safeSetLocalStorage, safeGetLocalStorage } from './safeStorage';
 
 export type Language = 'en' | 'ar' | 'kr';
 
@@ -428,42 +429,23 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>(() => {
-    const saved = localStorage.getItem('vida_lang');
-    return (saved as Language) || 'en';
+    return safeGetLocalStorage<Language>('vida_lang', 'en');
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem('vida_products');
-      return saved && saved !== 'undefined' ? JSON.parse(saved) : INITIAL_PRODUCTS;
-    } catch (e) {
-      console.error("Failed to parse vida_products from localStorage:", e);
-      return INITIAL_PRODUCTS;
-    }
+    return safeGetLocalStorage<Product[]>('vida_products', INITIAL_PRODUCTS);
   });
 
   const [categories, setCategories] = useState<Category[]>(() => {
-    try {
-      const saved = localStorage.getItem('vida_categories');
-      return saved && saved !== 'undefined' ? JSON.parse(saved) : INITIAL_CATEGORIES;
-    } catch (e) {
-      console.error("Failed to parse vida_categories from localStorage:", e);
-      return INITIAL_CATEGORIES;
-    }
+    return safeGetLocalStorage<Category[]>('vida_categories', INITIAL_CATEGORIES);
   });
 
   const [featuredItems, setFeaturedItems] = useState<FeaturedItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('vida_featured');
-      return saved && saved !== 'undefined' ? JSON.parse(saved) : INITIAL_FEATURED;
-    } catch (e) {
-      console.error("Failed to parse vida_featured from localStorage:", e);
-      return INITIAL_FEATURED;
-    }
+    return safeGetLocalStorage<FeaturedItem[]>('vida_featured', INITIAL_FEATURED);
   });
 
   const [heroImage, setHeroImage] = useState(() => {
-    return localStorage.getItem('vida_hero_image') || 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=2000';
+    return safeGetLocalStorage<string>('vida_hero_image', 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=2000');
   });
 
   // Real-time synchronization with Supabase
@@ -563,44 +545,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('vida_lang', language);
-      document.documentElement.dir = language === 'ar' || language === 'kr' ? 'rtl' : 'ltr';
-    } catch (e) {
-      console.error("Failed to save language to localStorage:", e);
-    }
+    safeSetLocalStorage('vida_lang', language);
+    document.documentElement.dir = language === 'ar' || language === 'kr' ? 'rtl' : 'ltr';
   }, [language]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('vida_products', JSON.stringify(products));
-    } catch (e) {
-      console.error("Failed to save products to localStorage:", e);
-    }
+    safeSetLocalStorage('vida_products', products);
   }, [products]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('vida_categories', JSON.stringify(categories));
-    } catch (e) {
-      console.error("Failed to save categories to localStorage:", e);
-    }
+    safeSetLocalStorage('vida_categories', categories);
   }, [categories]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('vida_featured', JSON.stringify(featuredItems));
-    } catch (e) {
-      console.error("Failed to save featuredItems to localStorage:", e);
-    }
+    safeSetLocalStorage('vida_featured', featuredItems);
   }, [featuredItems]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('vida_hero_image', heroImage);
-    } catch (e) {
-      console.error("Failed to save hero_image to localStorage:", e);
-    }
+    safeSetLocalStorage('vida_hero_image', heroImage);
   }, [heroImage]);
 
   const addProduct = async (product: Omit<Product, 'id'>) => {
